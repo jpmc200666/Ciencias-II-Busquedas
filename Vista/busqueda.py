@@ -1,4 +1,7 @@
 from Vista.lineal_interna import LinealInterna
+from Vista.binaria_interna import BinariaInterna
+from Vista.mod_interna import ModInterna
+
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
     QMenuBar, QMenu
@@ -93,11 +96,11 @@ class Busqueda(QMainWindow):
         menu_internas = QMenu("🔎 Búsquedas Internas", self)
         # Acciones directas
         menu_internas.addAction("Lineal", self.abrir_lineal)
-        menu_internas.addAction("Binaria", lambda t="Binaria": self.mostrar_opcion(t))
+        menu_internas.addAction("Binaria", self.abrir_binaria)
 
         # Submenú "Funciones Hash" (aparece al poner el mouse encima)
         submenu_hash = QMenu("Funciones Hash", self)
-        submenu_hash.addAction("Función mod", lambda t="Función mod": self.mostrar_opcion(t))
+        submenu_hash.addAction("Función mod", self.abrir_mod)
         submenu_hash.addAction("Función cuadrado", lambda t="Función cuadrado": self.mostrar_opcion(t))
         submenu_hash.addAction("Función truncamiento", lambda t="Función truncamiento": self.mostrar_opcion(t))
         submenu_hash.addAction("Función plegamiento", lambda t="Función plegamiento": self.mostrar_opcion(t))
@@ -137,5 +140,10 @@ class Busqueda(QMainWindow):
         self.label.setText(f"Opción seleccionada: {texto}")
 
     def abrir_lineal(self):
-        self.lineal_window = LinealInterna(self.cambiar_ventana)  # ✅ se pasa el callback
-        self.cambiar_ventana("lineal_externa")  # muestra la página en el stack
+        self.cambiar_ventana("lineal_interna")  # ✅ cambia de página en el stack
+
+    def abrir_binaria(self):
+        self.cambiar_ventana("binaria_interna")  # ✅ cambia de página en el stack
+
+    def abrir_mod(self):
+        self.cambiar_ventana("mod_interna")

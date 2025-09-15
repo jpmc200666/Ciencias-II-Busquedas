@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
     QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox
+    QMessageBox, QHBoxLayout
 )
 from PySide6.QtCore import Qt
 from .dialogo_clave import DialogoClave  # 👈 importamos el diálogo
@@ -22,6 +22,7 @@ class LinealInterna(QMainWindow):
         layout.setSpacing(20)
 
         # --- Encabezado ---
+        # --- Encabezado ---
         header = QFrame()
         header.setStyleSheet("""
             background: qlineargradient(
@@ -36,6 +37,38 @@ class LinealInterna(QMainWindow):
         titulo.setAlignment(Qt.AlignCenter)
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
+
+        # --- Menú debajo del título ---
+        menu_layout = QHBoxLayout()
+        menu_layout.setSpacing(40)  # separación entre botones
+        menu_layout.setAlignment(Qt.AlignCenter)  # 👈 asegura que queden al centro
+
+        btn_inicio = QPushButton("Inicio")
+        btn_busqueda = QPushButton("Menú de Búsqueda")
+
+        for btn in (btn_inicio, btn_busqueda):
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #2E1065;
+                    font-size: 16px;
+                    font-weight: bold;
+                    border: none;
+                }
+                QPushButton:hover {
+                    color: #6D28D9;
+                    text-decoration: underline;
+                }
+            """)
+            menu_layout.addWidget(btn)
+
+        # 👇 agrega el layout al header (debajo del título)
+        header_layout.addLayout(menu_layout)
+
+        # Conexiones del menú
+        btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
+        btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
+
         layout.addWidget(header)
 
         # --- Controles superiores ---
@@ -48,7 +81,7 @@ class LinealInterna(QMainWindow):
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_agregar = QPushButton("Adicionar claves")
         self.btn_cargar = QPushButton("Cargar estructura")
-        self.btn_salir = QPushButton("Salir")
+        self.btn_salir = QPushButton("Eliminar estructura")
 
         for btn in (self.btn_crear, self.btn_agregar, self.btn_cargar, self.btn_salir):
             btn.setStyleSheet("""
@@ -97,7 +130,7 @@ class LinealInterna(QMainWindow):
         self.btn_crear.clicked.connect(self.crear_estructura)
         self.btn_agregar.clicked.connect(self.adicionar_claves)
         self.btn_cargar.clicked.connect(self.cargar_estructura)
-        self.btn_salir.clicked.connect(self.volver_menu)  # 👉 ahora usa método
+        self.btn_salir.clicked.connect(self.eliminar_estructura)  # 👉 ahora usa método
 
         # Estado
         self.labels = []
@@ -254,12 +287,15 @@ class LinealInterna(QMainWindow):
                 )
                 return
 
-            # 👉 Guardar en el controlador (si hay espacio)
-            if self.controller.adicionar_clave(clave):
-                # Pintar visualmente en la primera posición libre
-                for lbl in self.labels:
-                    if lbl.text() == "":
-                        lbl.setText(clave)
+            # 👉 Guardar en el controlador y revisar estado
+            estado = self.controller.adicionar_clave(clave)
+
+            if estado == "OK":
+                # 👉 Repintar todos los labels con la lista ORDENADA
+                claves = self.controller.get_claves()
+                for i, lbl in enumerate(self.labels):
+                    if i < len(claves):
+                        lbl.setText(claves[i])
                         lbl.setStyleSheet("""
                             QLabel {
                                 background-color: #C4B5FD;
@@ -269,11 +305,25 @@ class LinealInterna(QMainWindow):
                                 font-weight: bold;
                             }
                         """)
-                        return
-            else:
+                    else:
+                        lbl.setText("")
+                        lbl.setStyleSheet("""
+                            QLabel {
+                                background-color: #EDE9FE;
+                                border: 2px solid #A78BFA;
+                                border-radius: 12px;
+                                font-size: 18px;
+                            }
+                        """)
+
+            elif estado == "REPETIDA":
+                QMessageBox.warning(self, "Clave duplicada", f"La clave {clave} ya fue insertada.")
+
+            elif estado == "LLENO":
                 QMessageBox.information(self, "Sin espacio", "No hay más espacios disponibles para agregar claves.")
 
-    def volver_menu(self):
-        """Cierra esta ventana y vuelve al menú principal."""
-        self.close()
-        self.cambiar_ventana("inicio")
+            elif estado == "LONGITUD":
+                QMessageBox.warning(self, "Error", f"La clave debe tener exactamente {self.digitos.value()} dígitos.")
+
+    def eliminar_estructura(self):
+        QMessageBox.information(self, "Pendiente", "Lógica de eliminar estructura aún no implementada.")
