@@ -2,8 +2,8 @@ import os
 from Modelo.manejador_archivos import ManejadorArchivos
 
 
-class ModController:
-    def __init__(self, ruta_archivo="data/mod.json"):
+class CuadradoController:
+    def __init__(self, ruta_archivo="data/cuadrado.json"):
         self.ruta_archivo = ruta_archivo
         self.estructura = {}
         self.capacidad = 0
@@ -14,63 +14,62 @@ class ModController:
     def crear_estructura(self, capacidad: int, digitos: int):
         self.capacidad = capacidad
         self.digitos = digitos
-        self.estructura = {i: "" for i in range(1, self.capacidad + 1)}
+        self.estructura = {i: "" for i in range(1, capacidad + 1)}
         self.guardar()
 
     def funcion_hash(self, clave: str) -> int:
         """
-        Función hash usando el método módulo:
-        (clave mod capacidad) + 1
+        Función hash por el método del cuadrado:
+        - Se eleva la clave al cuadrado.
+        - Se extraen los dígitos centrales según la regla:
+            * Si el cuadrado tiene impar de dígitos → se toma el central + uno a la izquierda.
+            * Si tiene par de dígitos → se toman los 2 centrales.
+        - Finalmente se suma 1 para obtener la posición (1-based).
         """
-        if self.capacidad == 0:
-            return 1
+        n = int(clave)
+        cuadrado = str(n * n)
+        longitud = len(cuadrado)
 
-        pos = (int(clave) % self.capacidad) + 1
+        if longitud % 2 == 1:  # impar
+            mid = longitud // 2
+            extraidos = cuadrado[mid - 1: mid + 1]  # central + uno a la izquierda
+        else:  # par
+            mid = longitud // 2
+            extraidos = cuadrado[mid - 1: mid + 1]  # dos centrales
 
-        # Ajuste para no pasarse del rango
-        if pos > self.capacidad:
-            pos = self.capacidad
+        pos = int(extraidos) + 1  # se suma 1 según tu regla
+
+        # 🔹 Ajustar al rango con índices 1..capacidad
+        if self.capacidad > 0:
+            pos = ((pos - 1) % self.capacidad) + 1
 
         return pos
 
     def agregar_clave(self, clave: str) -> str:
-        """
-        Inserta una clave en la estructura usando la función hash mod.
-        Devuelve:
-            - "OK" si se insertó
-            - "REPETIDA" si ya existe
-            - "LLENO" si no hay espacio en esa posición
-            - "LONGITUD" si no cumple los dígitos
-        """
-        # Validar longitud
         if len(clave) != self.digitos:
             return "LONGITUD"
 
-        # Validar repetida
-        if str(clave) in map(str, self.estructura.values()):
+        if clave in self.estructura.values():
             return "REPETIDA"
 
-        # Calcular índice hash
         pos = self.funcion_hash(clave)
 
-        # Insertar si está vacío
         if self.estructura[pos] == "":
-            self.estructura[pos] = str(clave)
+            self.estructura[pos] = clave
         else:
-            return "LLENO"  # (por ahora sin manejo de colisiones)
+            return "LLENO"  # no maneja colisiones todavía
 
         self.guardar()
         return "OK"
 
     def adicionar_clave(self, clave: str) -> str:
-        """Alias para compatibilidad con la vista."""
         return self.agregar_clave(clave)
 
     def guardar(self):
         datos = {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
-            "estructura": self.estructura
+            "estructura": self.estructura,
         }
         ManejadorArchivos.guardar_json(self.ruta_archivo, datos)
 
@@ -87,7 +86,7 @@ class ModController:
         return {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
-            "estructura": self.estructura
+            "estructura": self.estructura,
         }
 
     def get_claves(self):

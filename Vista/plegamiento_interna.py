@@ -5,16 +5,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from .dialogo_clave import DialogoClave
-from Controlador.Internas.mod_controller import ModController
+from Controlador.Internas.plegamiento_controller import PlegamientoController
 
 
-class ModInterna(QMainWindow):
+class PlegamientoInterna(QMainWindow):
     def __init__(self, cambiar_ventana):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
-        self.controller = ModController()
+        self.controller = PlegamientoController()
 
-        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Módulo)")
+        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Plegamiento)")
 
         # --- Layout principal ---
         central = QWidget()
@@ -32,7 +32,7 @@ class ModInterna(QMainWindow):
         """)
         header_layout = QVBoxLayout(header)
 
-        titulo = QLabel("Ciencias de la Computación II - Función Hash (Módulo)")
+        titulo = QLabel("Ciencias de la Computación II - Función Hash (Plegamiento)")
         titulo.setAlignment(Qt.AlignCenter)
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
@@ -69,9 +69,9 @@ class ModInterna(QMainWindow):
 
         # --- Controles superiores ---
         self.rango = QComboBox()
-        self.rango.addItems([f"10^{i}" for i in range(1, 6)])  # igual que en binaria_interna
+        self.rango.addItems([f"10^{i}" for i in range(1, 6)])
         self.digitos = QSpinBox()
-        self.digitos.setRange(1, 10)
+        self.digitos.setRange(2, 10)
         self.digitos.setValue(4)
 
         self.btn_crear = QPushButton("Crear estructura")
@@ -138,11 +138,8 @@ class ModInterna(QMainWindow):
                 widget.setParent(None)
         self.labels.clear()
 
-        # Capacidad depende del rango
         n = int(self.rango.currentText().split("^")[1])
         self.capacidad = 10 ** n
-
-        # Crear estructura en el controlador
         self.controller.crear_estructura(self.capacidad, self.digitos.value())
 
         if self.capacidad > 1000:
@@ -185,7 +182,6 @@ class ModInterna(QMainWindow):
         """)
         self.grid.addWidget(cuadro, fila, col, alignment=Qt.AlignCenter)
 
-        # debajo se muestra el índice real
         numero = QLabel(str(idx_real))
         numero.setAlignment(Qt.AlignCenter)
         numero.setStyleSheet("font-size: 14px; color: gray; margin-top: 5px;")
@@ -194,7 +190,7 @@ class ModInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
-        if self.capacidad == 0 or self.controller is None:
+        if self.capacidad == 0:
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
@@ -207,7 +203,7 @@ class ModInterna(QMainWindow):
                 datos = self.controller.obtener_datos_vista()
                 for i, val in datos["estructura"].items():
                     if 1 <= i <= len(self.labels):
-                        self.labels[i - 1].setText(val)  # 👈 restamos 1 para cuadrar con el índice de la lista
+                        self.labels[i - 1].setText(val)
 
             elif resultado == "LONGITUD":
                 QMessageBox.warning(self, "Error", "La clave no cumple con la longitud definida.")
@@ -220,4 +216,4 @@ class ModInterna(QMainWindow):
         QMessageBox.information(self, "Pendiente", "Lógica de cargar estructura aún no implementada.")
 
     def eliminar_estructura(self):
-       pass
+        pass

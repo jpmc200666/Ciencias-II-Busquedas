@@ -2,40 +2,46 @@ import os
 from Modelo.manejador_archivos import ManejadorArchivos
 
 
-class ModController:
-    def __init__(self, ruta_archivo="data/mod.json"):
+class TruncamientoController:
+    def __init__(self, ruta_archivo="data/truncamiento.json"):
         self.ruta_archivo = ruta_archivo
         self.estructura = {}
         self.capacidad = 0
         self.digitos = 0
+        self.posiciones = []  # 👈 posiciones que elige el usuario (1-based)
 
         os.makedirs(os.path.dirname(self.ruta_archivo), exist_ok=True)
 
-    def crear_estructura(self, capacidad: int, digitos: int):
+    def crear_estructura(self, capacidad: int, digitos: int, posiciones: list[int]):
         self.capacidad = capacidad
         self.digitos = digitos
+        self.posiciones = posiciones
         self.estructura = {i: "" for i in range(1, self.capacidad + 1)}
         self.guardar()
 
+    def _digitos_necesarios(self):
+        """Determina cuántos dígitos se requieren según la capacidad."""
+        return len(str(self.capacidad - 1))
+
     def funcion_hash(self, clave: str) -> int:
         """
-        Función hash usando el método módulo:
-        (clave mod capacidad) + 1
+        Función hash usando truncamiento en posiciones elegidas.
+        Ejemplo:
+            clave = "2835", posiciones = [2, 3], capacidad = 100
+            -> tomamos clave[1] y clave[2] = "83"
+            -> int("83") + 1 = 84
         """
-        if self.capacidad == 0:
-            return 1
+        digitos_requeridos = self._digitos_necesarios()
 
-        pos = (int(clave) % self.capacidad) + 1
+        # Tomar solo las posiciones necesarias
+        seleccionados = [clave[p - 1] for p in self.posiciones[:digitos_requeridos]]
+        valor = int("".join(seleccionados))
 
-        # Ajuste para no pasarse del rango
-        if pos > self.capacidad:
-            pos = self.capacidad
-
-        return pos
+        return valor + 1  # siempre +1 para que sea 1-based
 
     def agregar_clave(self, clave: str) -> str:
         """
-        Inserta una clave en la estructura usando la función hash mod.
+        Inserta una clave en la estructura usando truncamiento.
         Devuelve:
             - "OK" si se insertó
             - "REPETIDA" si ya existe
@@ -54,22 +60,19 @@ class ModController:
         pos = self.funcion_hash(clave)
 
         # Insertar si está vacío
-        if self.estructura[pos] == "":
+        if self.estructura.get(pos, "") == "":
             self.estructura[pos] = str(clave)
         else:
-            return "LLENO"  # (por ahora sin manejo de colisiones)
+            return "LLENO"  # por ahora sin manejo de colisiones
 
         self.guardar()
         return "OK"
-
-    def adicionar_clave(self, clave: str) -> str:
-        """Alias para compatibilidad con la vista."""
-        return self.agregar_clave(clave)
 
     def guardar(self):
         datos = {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
+            "posiciones": self.posiciones,
             "estructura": self.estructura
         }
         ManejadorArchivos.guardar_json(self.ruta_archivo, datos)
@@ -79,6 +82,7 @@ class ModController:
         if datos:
             self.capacidad = datos.get("capacidad", 0)
             self.digitos = datos.get("digitos", 0)
+            self.posiciones = datos.get("posiciones", [])
             self.estructura = {int(k): v for k, v in datos.get("estructura", {}).items()}
             return True
         return False
@@ -87,6 +91,7 @@ class ModController:
         return {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
+            "posiciones": self.posiciones,
             "estructura": self.estructura
         }
 

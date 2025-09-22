@@ -1,20 +1,21 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
     QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox, QHBoxLayout, QDialog,
+    QMessageBox, QHBoxLayout, QLineEdit
 )
 from PySide6.QtCore import Qt
 from .dialogo_clave import DialogoClave
-from Controlador.Internas.mod_controller import ModController
+from Controlador.Internas.truncamiento_controller import TruncamientoController
+from .dialogo_posiciones import DialogoPosiciones
 
 
-class ModInterna(QMainWindow):
+class TruncamientoInterna(QMainWindow):
     def __init__(self, cambiar_ventana):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
-        self.controller = ModController()
+        self.controller = TruncamientoController()
 
-        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Módulo)")
+        self.setWindowTitle("Ciencias de la Computación II - Búsqueda por Truncamiento")
 
         # --- Layout principal ---
         central = QWidget()
@@ -32,7 +33,7 @@ class ModInterna(QMainWindow):
         """)
         header_layout = QVBoxLayout(header)
 
-        titulo = QLabel("Ciencias de la Computación II - Función Hash (Módulo)")
+        titulo = QLabel("Ciencias de la Computación II - Búsqueda por Truncamiento")
         titulo.setAlignment(Qt.AlignCenter)
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
@@ -62,14 +63,15 @@ class ModInterna(QMainWindow):
             menu_layout.addWidget(btn)
 
         header_layout.addLayout(menu_layout)
+
         btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
 
         layout.addWidget(header)
 
-        # --- Controles superiores ---
+        # --- Controles ---
         self.rango = QComboBox()
-        self.rango.addItems([f"10^{i}" for i in range(1, 6)])  # igual que en binaria_interna
+        self.rango.addItems([f"10^{i}" for i in range(1, 6)])
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
@@ -131,46 +133,50 @@ class ModInterna(QMainWindow):
 
     # --- Métodos básicos ---
     def crear_estructura(self):
-        # Limpia
+        # limpiar anterior
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
         self.labels.clear()
 
-        # Capacidad depende del rango
         n = int(self.rango.currentText().split("^")[1])
         self.capacidad = 10 ** n
 
-        # Crear estructura en el controlador
-        self.controller.crear_estructura(self.capacidad, self.digitos.value())
+        # Crear estructura vacía (sin posiciones aún)
+        self.controller.crear_estructura(self.capacidad, self.digitos.value(), [])
 
-        if self.capacidad > 1000:
-            QMessageBox.information(
-                self, "Vista representativa",
-                f"La capacidad real es {self.capacidad}, "
-                "pero solo se muestra parcialmente."
-            )
-            mostrar = 50
-            for i in range(mostrar):
-                self._agregar_cuadro(i + 1, i + 1)
+        for i in range(self.capacidad if self.capacidad <= 100 else 100):
+            self._agregar_cuadro(i)
 
-            puntos = QLabel("...")
-            puntos.setStyleSheet("font-size: 18px; color: gray;")
-            self.grid.addWidget(
-                puntos, (mostrar // 10) * 2, mostrar % 10, 2, 1, alignment=Qt.AlignCenter
-            )
+        # --- pedir posiciones con reintento ---
+        digitos_req = self.controller._digitos_necesarios()
+        while True:
+            dlg = DialogoPosiciones(self.digitos.value(), digitos_req, self)
+            if dlg.exec():
+                posiciones = dlg.get_posiciones(digitos_req)
+                if posiciones:
+                    self.controller.posiciones = posiciones
+                    self.controller.guardar()
+                    QMessageBox.information(
+                        self, "OK",
+                        f"Posiciones seleccionadas: {posiciones}"
+                    )
+                    break
+                else:
+                    QMessageBox.warning(
+                        self, "Error",
+                        f"Debes seleccionar exactamente {digitos_req} posición(es)."
+                    )
+            else:
+                QMessageBox.warning(
+                    self, "Cancelado",
+                    "Debes seleccionar posiciones antes de continuar."
+                )
 
-            for i in range(mostrar):
-                idx_real = self.capacidad - mostrar + i + 1
-                self._agregar_cuadro(mostrar + i + 1, idx_real)
-        else:
-            for i in range(self.capacidad):
-                self._agregar_cuadro(i + 1, i + 1)
-
-    def _agregar_cuadro(self, idx_visual, idx_real):
-        fila = ((idx_visual - 1) // 10) * 2
-        col = (idx_visual - 1) % 10
+    def _agregar_cuadro(self, i):
+        fila = (i // 10) * 2
+        col = i % 10
 
         cuadro = QLabel("")
         cuadro.setAlignment(Qt.AlignCenter)
@@ -185,8 +191,7 @@ class ModInterna(QMainWindow):
         """)
         self.grid.addWidget(cuadro, fila, col, alignment=Qt.AlignCenter)
 
-        # debajo se muestra el índice real
-        numero = QLabel(str(idx_real))
+        numero = QLabel(str(i + 1))
         numero.setAlignment(Qt.AlignCenter)
         numero.setStyleSheet("font-size: 14px; color: gray; margin-top: 5px;")
         self.grid.addWidget(numero, fila + 1, col, alignment=Qt.AlignCenter)
@@ -194,30 +199,65 @@ class ModInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
-        if self.capacidad == 0 or self.controller is None:
+        if not self.labels:
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
-        dialogo = DialogoClave(self.digitos.value(), self)
-        if dialogo.exec() == QDialog.Accepted:
-            clave = dialogo.get_clave()
-            resultado = self.controller.adicionar_clave(clave)
+        # Si aún no se han definido posiciones, pedirlas ahora
+        if not self.controller.posiciones:
+            texto_pos = self.posiciones_input.text().strip()
+            if texto_pos:
+                try:
+                    posiciones = [int(p) for p in texto_pos.split(",") if p.strip().isdigit()]
+                except ValueError:
+                    QMessageBox.warning(self, "Error", "Posiciones inválidas. Usa números separados por coma.")
+                    return
+            else:
+                QMessageBox.warning(self, "Error", "Debes indicar al menos una posición antes de insertar.")
+                return
+            self.controller.posiciones = posiciones
+            self.controller.guardar()
 
-            if resultado == "OK":
-                datos = self.controller.obtener_datos_vista()
-                for i, val in datos["estructura"].items():
-                    if 1 <= i <= len(self.labels):
-                        self.labels[i - 1].setText(val)  # 👈 restamos 1 para cuadrar con el índice de la lista
+        dlg = DialogoClave(self.digitos.value(), self)
+        if dlg.exec():
+            clave = dlg.get_clave()
+            estado = self.controller.agregar_clave(clave)  # 👈 aquí corriges nombre, usabas "adicionar_clave"
 
-            elif resultado == "LONGITUD":
-                QMessageBox.warning(self, "Error", "La clave no cumple con la longitud definida.")
-            elif resultado == "REPETIDA":
-                QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
-            elif resultado == "LLENO":
+            if estado == "OK":
+                estructura = self.controller.estructura
+                for i, lbl in enumerate(self.labels, start=1):
+                    valor = estructura.get(i, "")
+                    if valor != "":
+                        lbl.setText(valor)
+                        lbl.setStyleSheet("""
+                            QLabel {
+                                background-color: #C4B5FD;
+                                border: 2px solid #6D28D9;
+                                border-radius: 12px;
+                                font-size: 18px;
+                                font-weight: bold;
+                            }
+                        """)
+                    else:
+                        lbl.setText("")
+                        lbl.setStyleSheet("""
+                            QLabel {
+                                background-color: #EDE9FE;
+                                border: 2px solid #A78BFA;
+                                border-radius: 12px;
+                                font-size: 18px;
+                            }
+                        """)
+
+            elif estado == "REPETIDA":
+                QMessageBox.warning(self, "Error", f"La clave {clave} ya fue insertada.")
+            elif estado == "LLENO":
                 QMessageBox.warning(self, "Error", "La estructura está llena.")
+            elif estado == "LONGITUD":
+                QMessageBox.warning(self, "Error", "Longitud incorrecta.")
 
     def cargar_estructura(self):
         QMessageBox.information(self, "Pendiente", "Lógica de cargar estructura aún no implementada.")
 
     def eliminar_estructura(self):
-       pass
+        QMessageBox.information(self, "Pendiente", "Lógica de eliminar estructura aún no implementada.")

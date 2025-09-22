@@ -1,6 +1,10 @@
 from Vista.lineal_interna import LinealInterna
 from Vista.binaria_interna import BinariaInterna
 from Vista.mod_interna import ModInterna
+from Vista.cuadrado_interna import CuadradoInterna
+from Vista.truncamiento_interna import TruncamientoInterna
+from Vista.plegamiento_interna import PlegamientoInterna
+
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
@@ -101,9 +105,9 @@ class Busqueda(QMainWindow):
         # Submenú "Funciones Hash" (aparece al poner el mouse encima)
         submenu_hash = QMenu("Funciones Hash", self)
         submenu_hash.addAction("Función mod", self.abrir_mod)
-        submenu_hash.addAction("Función cuadrado", lambda t="Función cuadrado": self.mostrar_opcion(t))
-        submenu_hash.addAction("Función truncamiento", lambda t="Función truncamiento": self.mostrar_opcion(t))
-        submenu_hash.addAction("Función plegamiento", lambda t="Función plegamiento": self.mostrar_opcion(t))
+        submenu_hash.addAction("Función cuadrado", self.abrir_cuadrado)
+        submenu_hash.addAction("Función truncamiento",  self.abrir_truncamiento)
+        submenu_hash.addAction("Función plegamiento", self.abrir_plegamiento)
 
         menu_internas.addMenu(submenu_hash)
         menu_internas.addAction("Otras", lambda t="Otras": self.mostrar_opcion(t))
@@ -147,3 +151,13 @@ class Busqueda(QMainWindow):
 
     def abrir_mod(self):
         self.cambiar_ventana("mod_interna")
+
+    def abrir_cuadrado(self):
+        self.cambiar_ventana("cuadrado_interna")
+
+    def abrir_truncamiento(self):
+        self.cambiar_ventana("truncamiento_interna")  # ✅ abre la nueva pestaña
+
+    def abrir_plegamiento(self):
+        self.cambiar_ventana("plegamiento_interna")
+
