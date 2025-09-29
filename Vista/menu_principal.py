@@ -9,6 +9,11 @@ from Vista.mod_interna import ModInterna   # 👈 importa la clase
 from Vista.cuadrado_interna import CuadradoInterna
 from Vista.truncamiento_interna import TruncamientoInterna   # 👈 nuevo
 from Vista.plegamiento_interna import PlegamientoInterna
+from Vista.busqueda_residuos import BusquedaResiduos
+from Vista.arboles_digitales import ArbolesDigitales
+from Vista.tries_residuos import TriesResiduos
+from Vista.multiples_residuos import MultiplesResiduos
+from Vista.arboles_huffman import ArbolesHuffman
 
 
 class MainWindow(QMainWindow):
@@ -30,6 +35,11 @@ class MainWindow(QMainWindow):
         self.cuadrado_interna = CuadradoInterna(cambiar_pagina_callback)
         self.truncamiento_interna = TruncamientoInterna(cambiar_pagina_callback)  # 👈 nuevo
         self.plegamiento_interna = PlegamientoInterna(cambiar_pagina_callback)
+        self.busqueda_residuos = BusquedaResiduos(cambiar_pagina_callback)
+        self.arboles_digitales = ArbolesDigitales(cambiar_pagina_callback)
+        self.tries_residuos = TriesResiduos(cambiar_pagina_callback)
+        self.multiples_residuos = MultiplesResiduos(cambiar_pagina_callback)
+        self.arboles_huffman = ArbolesHuffman(cambiar_pagina_callback)
 
         # Añadir al stack
         self.stacked.addWidget(self.inicio)          # 0
@@ -41,6 +51,11 @@ class MainWindow(QMainWindow):
         self.stacked.addWidget(self.cuadrado_interna)  # 6
         self.stacked.addWidget(self.truncamiento_interna) # 7 👈 nuevo
         self.stacked.addWidget(self.plegamiento_interna)  # 8
+        self.stacked.addWidget(self.busqueda_residuos)  # 9
+        self.stacked.addWidget(self.arboles_digitales)  # 10
+        self.stacked.addWidget(self.tries_residuos)  # 11
+        self.stacked.addWidget(self.multiples_residuos)  # 12
+        self.stacked.addWidget(self.arboles_huffman)  # 13
 
         # Página inicial
         self.stacked.setCurrentIndex(0)
@@ -54,9 +69,13 @@ class MainWindow(QMainWindow):
             "binaria_interna": 4,
             "mod_interna": 5,
             "cuadrado_interna": 6,
-            "truncamiento_interna": 7,  # 👈 nuevo
-            "plegamiento_interna": 8
-
+            "truncamiento_interna": 7,
+            "plegamiento_interna": 8,
+            "busqueda_residuos": 9,
+            "arboles_digitales": 10,
+            "tries_residuos": 11,
+            "multiples_residuos": 12,
+            "arboles_huffman": 13
         }
 
         if nombre in paginas:
