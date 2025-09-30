@@ -207,34 +207,46 @@ class ModInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
+        """Método corregido para adicionar claves con manejo de colisiones."""
         if self.capacidad == 0 or self.controller is None:
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
+        # Obtener la clave del usuario
         dialogo = DialogoClave(self.digitos.value(), self)
-        if dialogo.exec() == QDialog.Accepted:
-            clave = dialogo.get_clave()
+        if dialogo.exec() != QDialog.Accepted:
+            return
 
-            # Intentar insertar con estrategia default
-            resultado = self.controller.adicionar_clave(clave)
+        clave = dialogo.get_clave()
 
-            if resultado.startswith("ERROR:"):
-                # Colisión → pedir estrategia
-                dlg_col = DialogoColisiones(self)
-                if dlg_col.exec() == QDialog.Accepted:
-                    estrategia = dlg_col.get_estrategia()
-                    resultado = self.controller.adicionar_clave(clave, estrategia)
+        # Intentar insertar sin estrategia (para detectar colisión)
+        resultado = self.controller.adicionar_clave(clave)
 
-            if resultado == "OK":
-                datos = self.controller.obtener_datos_vista()
-                for i, val in datos["estructura"].items():
-                    if 1 <= i <= len(self.labels) and val:
-                        self.labels[i - 1].setText(val)
-            elif resultado == "LONGITUD":
-                QMessageBox.warning(self, "Error", "La clave no cumple con la longitud definida.")
-            elif resultado == "REPETIDA":
-                QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
+        if resultado == "COLISION":
+            # HAY COLISIÓN - Mostrar diálogo de estrategias
+            dlg_col = DialogoColisiones(self)
+            if dlg_col.exec() == QDialog.Accepted:
+                estrategia = dlg_col.get_estrategia()
+                # Reintentar con la estrategia seleccionada
+                resultado = self.controller.adicionar_clave(clave, estrategia)
+            else:
+                # Usuario canceló la selección de estrategia
+                QMessageBox.information(self, "Cancelado", "Inserción cancelada.")
+                return
 
+        # Manejar resultados
+        if resultado == "OK":
+            QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
+            self.actualizar_tabla()
+        elif resultado == "LONGITUD":
+            QMessageBox.warning(self, "Error",
+                                f"La clave debe tener exactamente {self.digitos.value()} dígitos.")
+        elif resultado == "REPETIDA":
+            QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
+        elif resultado.startswith("ERROR:"):
+            QMessageBox.critical(self, "Error", resultado)
+        else:
+            QMessageBox.warning(self, "Error", f"Resultado inesperado: {resultado}")
     def cargar_estructura(self):
         # ⚠️ Advertencia si ya hay datos en memoria
         if self.controller.capacidad > 0 and any(self.controller.estructura.values()):

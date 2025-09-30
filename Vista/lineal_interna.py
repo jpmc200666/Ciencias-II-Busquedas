@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
     QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox, QHBoxLayout, QInputDialog, QFileDialog
+    QMessageBox, QHBoxLayout, QDialog, QFileDialog
 )
 from PySide6.QtCore import Qt
-from .dialogo_clave import DialogoClave  # diálogo para ingresar clave
+from .dialogo_clave import DialogoClave
 from Controlador.Internas.lineal_controller import LinealController
 from Modelo.manejador_archivos import ManejadorArchivos
 from datetime import datetime
@@ -18,12 +18,10 @@ class LinealInterna(QMainWindow):
 
         self.setWindowTitle("Ciencias de la Computación II - Búsqueda Lineal")
 
-        # --- Layout principal ---
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.setSpacing(20)
 
-        # --- Encabezado ---
         header = QFrame()
         header.setStyleSheet("""
             background: qlineargradient(
@@ -39,7 +37,6 @@ class LinealInterna(QMainWindow):
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
 
-        # --- Menú debajo del título ---
         menu_layout = QHBoxLayout()
         menu_layout.setSpacing(40)
         menu_layout.setAlignment(Qt.AlignCenter)
@@ -68,14 +65,14 @@ class LinealInterna(QMainWindow):
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
         layout.addWidget(header)
 
-        # --- Controles superiores ---
         self.rango = QComboBox()
-        self.rango.addItems([f"10^{i}" for i in range(1, 6)])
+        # 👉 Mostrar solo los números (exponentes)
+        self.rango.addItems([str(i) for i in range(1, 7)])  # 1 hasta 6
+        self.rango.setFixedWidth(100)
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
 
-        # Botones principales
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_insertar = QPushButton("Insertar claves")
         self.btn_guardar = QPushButton("Guardar estructura")
@@ -104,11 +101,28 @@ class LinealInterna(QMainWindow):
                 }
             """)
 
+        # En el constructor (init)
         controles = QVBoxLayout()
-        controles.addWidget(QLabel("Rango (10^n):"))
-        controles.addWidget(self.rango)
-        controles.addWidget(QLabel("Número de dígitos de la clave:"))
-        controles.addWidget(self.digitos)
+
+        fila_controles = QHBoxLayout()
+        fila_controles.setSpacing(20)
+        fila_controles.setAlignment(Qt.AlignCenter)
+
+        lbl_rango = QLabel("Rango (10^n):")
+        lbl_rango.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.rango.setStyleSheet("font-size: 16px; padding: 5px;")
+
+        lbl_digitos = QLabel("Número de dígitos:")
+        lbl_digitos.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.digitos.setFixedWidth(100)
+        self.digitos.setStyleSheet("font-size: 16px; padding: 5px;")
+
+        fila_controles.addWidget(lbl_rango)
+        fila_controles.addWidget(self.rango)
+        fila_controles.addWidget(lbl_digitos)
+        fila_controles.addWidget(self.digitos)
+
+        controles.addLayout(fila_controles)
 
         grid_botones = QGridLayout()
         grid_botones.addWidget(self.btn_crear, 0, 0)
@@ -123,18 +137,18 @@ class LinealInterna(QMainWindow):
         controles.addLayout(grid_botones)
         layout.addLayout(controles)
 
-        # --- Contenedor con scroll ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.contenedor = QWidget()
-        self.grid = QGridLayout(self.contenedor)
-        self.grid.setAlignment(Qt.AlignCenter)
+        self.contenedor_layout = QVBoxLayout(self.contenedor)
+        self.contenedor_layout.setSpacing(10)
+        self.contenedor_layout.setContentsMargins(20, 20, 20, 20)
+        self.contenedor_layout.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         self.scroll.setWidget(self.contenedor)
         layout.addWidget(self.scroll)
 
         self.setCentralWidget(central)
 
-        # --- Conexiones ---
         self.btn_crear.clicked.connect(self.crear_estructura)
         self.btn_insertar.clicked.connect(self.adicionar_claves)
         self.btn_guardar.clicked.connect(self.guardar_estructura)
@@ -144,255 +158,365 @@ class LinealInterna(QMainWindow):
         self.btn_eliminar_clave.clicked.connect(self.eliminar_clave)
         self.btn_buscar_clave.clicked.connect(self.buscar_clave)
 
-        # Estado
+        self.filas_info = []
         self.labels = []
+        self.indices_labels = []
+        self.indices_reales = []
         self.capacidad = 0
         self.historial = []
 
-    # ========================
-    # Métodos de funcionalidad
-    # ========================
-
-    def cargar_estructura(self):
-        """Abrir un JSON guardado y reconstruir la vista."""
-        try:
-            if self.labels or self.capacidad:
-                respuesta = QMessageBox.question(
-                    self, "Confirmar carga",
-                    "Ya existe una estructura cargada.\n"
-                    "Si continúas, será sobreescrita.\n\n¿Deseas continuar?",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-                )
-                if respuesta == QMessageBox.No:
-                    return
-
-            archivo, _ = QFileDialog.getOpenFileName(
-                self, "Seleccionar archivo JSON", "", "JSON (*.json)"
-            )
-            if not archivo:
-                return
-
-            datos = ManejadorArchivos.leer_json(archivo)
-            if not datos:
-                QMessageBox.warning(self, "Error", "Archivo inválido o vacío.")
-                return
-
-            rango = datos.get("rango")
-            digitos = datos.get("digitos", self.digitos.value())
-            capacidad = datos.get("capacidad", len(datos.get("claves", [])))
-            claves = datos.get("claves", [])
-
-            # ----------------------------
-            # SINCRONIZAR controller con lo cargado
-            # ----------------------------
-            # Asegurarnos de que el controller tenga la misma capacidad y digitos
-            self.controller.crear_estructura(capacidad, digitos)
-
-            # Normalizar 'claves' a una lista de longitud 'capacidad'
-            if isinstance(claves, dict):
-                # si viene como dict 1-based -> convertir a lista 0-based
-                max_idx = max((int(k) for k in claves.keys()), default=0)
-                capacidad = max(capacidad, max_idx)
-                lista = [""] * capacidad
-                for k, v in claves.items():
-                    idx = int(k) - 1
-                    if 0 <= idx < capacidad:
-                        lista[idx] = str(v) if v is not None else ""
-                claves = lista
-            else:
-                # aseguramos longitud mínima
-                claves = [str(x) if x is not None else "" for x in claves]
-                if len(claves) < capacidad:
-                    claves += [""] * (capacidad - len(claves))
-
-            # Cargar valores en el controller (índices 0..capacidad-1)
-            nueva = {i: (claves[i] if i < len(claves) else "") for i in range(capacidad)}
-            self.controller.estructura = nueva
-            self.controller.capacidad = capacidad
-            self.controller.digitos = digitos
-            # opcional: guardar estado en archivo del controller
-            self.controller.guardar()
-            # ----------------------------
-
-            # limpiar grilla
-            for i in reversed(range(self.grid.count())):
-                widget = self.grid.itemAt(i).widget()
-                if widget:
-                    widget.setParent(None)
-            self.labels.clear()
-
-            self.capacidad = capacidad
-            if rango:
-                idx = self.rango.findText(rango)
-                if idx != -1:
-                    self.rango.setCurrentIndex(idx)
-            self.digitos.setValue(digitos)
-
-            if capacidad > 1000:
-                # Guardamos como atributos para que otros helpers los usen
-                self.mostrar_inicio = 50
-                self.mostrar_final = 50
-
-                # Mostrar primeros cuadros (visual indices 0..mostrar_inicio-1)
-                for i in range(self.mostrar_inicio):
-                    self._agregar_cuadro(i, i)
-
-                # Puntos suspensivos en la rejilla
-                puntos = QLabel("...")
-                puntos.setStyleSheet("font-size: 18px; color: gray;")
-                self.grid.addWidget(
-                    puntos,
-                    (self.mostrar_inicio // 10) * 2,
-                    self.mostrar_inicio % 10,
-                    2, 1,
-                    alignment=Qt.AlignCenter
-                )
-
-                # Mostrar últimos cuadros (visual indices self.mostrar_inicio .. self.mostrar_inicio+mostrar_final-1)
-                for i in range(self.mostrar_final):
-                    idx_real = capacidad - self.mostrar_final + i
-                    self._agregar_cuadro(self.mostrar_inicio + i, idx_real)
-
-            else:
-                for i in range(capacidad):
-                    self._agregar_cuadro(i, i)
-
-            for i, lbl in enumerate(self.labels):
-                if i < len(claves) and claves[i]:
-                    lbl.setText(claves[i])
-                    lbl.setStyleSheet("""
-                        QLabel {
-                            background-color: #C4B5FD;
-                            border: 2px solid #6D28D9;
-                            border-radius: 12px;
-                            font-size: 18px;
-                            font-weight: bold;
-                        }
-                    """)
-                else:
-                    lbl.setText("")
-                    lbl.setStyleSheet("""
-                        QLabel {
-                            background-color: #EDE9FE;
-                            border: 2px solid #A78BFA;
-                            border-radius: 12px;
-                            font-size: 18px;
-                        }
-                    """)
-            QMessageBox.information(self, "Éxito", "Estructura cargada correctamente")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo cargar la estructura:\n{e}")
-
     def crear_estructura(self):
-        # limpiar
-        for i in reversed(range(self.grid.count())):
-            widget = self.grid.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
-        self.labels.clear()
+        self._limpiar_vista()
 
-        n = int(self.rango.currentText().split("^")[1])
+        # 👉 Tomar el exponente seleccionado y calcular 10^n
+        n = int(self.rango.currentText())
         capacidad = 10 ** n
+
         self.controller.crear_estructura(capacidad, self.digitos.value())
         self.controller.guardar()
         self.capacidad = capacidad
 
-        if capacidad > 1000:
-            QMessageBox.information(
-                self, "Vista representativa",
-                f"La capacidad real es {capacidad}, pero se muestra parcial."
-            )
-            mostrar_inicio, mostrar_final = 50, 50
-            for i in range(mostrar_inicio):
-                self._agregar_cuadro(i, i)
-            puntos = QLabel("...")
-            puntos.setStyleSheet("font-size: 18px; color: gray;")
-            self.grid.addWidget(puntos, (mostrar_inicio // 10) * 2,
-                                mostrar_inicio % 10, 2, 1, alignment=Qt.AlignCenter)
-            for i in range(mostrar_final):
-                idx_real = capacidad - mostrar_final + i
-                self._agregar_cuadro(mostrar_inicio + i + 1, idx_real)
-        else:
-            for i in range(capacidad):
-                self._agregar_cuadro(i, i)
+        self._reconstruir_vista()
 
-    def _agregar_cuadro(self, i, idx_real):
-        fila = (i // 10) * 2
-        col = i % 10
+        # 🔒 Bloquear rango y dígitos
+        self.rango.setEnabled(False)
+        self.digitos.setEnabled(False)
+
+    def _limpiar_vista(self):
+        while self.contenedor_layout.count():
+            item = self.contenedor_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.filas_info.clear()
+        self.labels.clear()
+        self.indices_labels.clear()
+        self.indices_reales.clear()
+
+    def _reconstruir_vista(self):
+        self._limpiar_vista()
+
+        if self.capacidad <= 10:
+            self._crear_fila(0, self.capacidad, completa=True)
+            return
+
+        total_ocupadas = sum(
+            1 for i in range(self.capacidad)
+            if self.controller.estructura.get(i, "") != ""
+        )
+
+        if total_ocupadas <= 8:
+            self._crear_fila(0, 8, completa=False)
+        else:
+            self._crear_fila(0, 10, completa=True)
+
+            if total_ocupadas <= 18:
+                self._crear_fila(10, 8, completa=False)
+            else:
+                self._crear_fila(10, 10, completa=True)
+
+                if total_ocupadas <= 28:
+                    self._crear_fila(20, 8, completa=False)
+                else:
+                    fila_actual = 20
+                    while fila_actual < self.capacidad:
+                        ocupadas_hasta_aqui = sum(
+                            1 for i in range(fila_actual + 10)
+                            if self.controller.estructura.get(i, "") != ""
+                        )
+                        if ocupadas_hasta_aqui <= fila_actual + 8:
+                            self._crear_fila(fila_actual, 8, completa=False)
+                            break
+                        else:
+                            self._crear_fila(fila_actual, 10, completa=True)
+                            fila_actual += 10
+
+    def _crear_fila(self, inicio, cantidad, completa):
+        fila_container = QWidget()
+        fila_container.setStyleSheet("background: transparent;")
+        fila_layout = QHBoxLayout(fila_container)
+        fila_layout.setSpacing(0)
+        fila_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 📌 Antes estaba AlignLeft → cambiamos a centrado
+        fila_layout.setAlignment(Qt.AlignHCenter)
+
+        if completa:
+            for i in range(cantidad):
+                idx_real = inicio + i
+                if idx_real < self.capacidad:
+                    self._agregar_bloque(fila_layout, idx_real)
+        else:
+            for i in range(cantidad):
+                idx_real = inicio + i
+                if idx_real < self.capacidad:
+                    self._agregar_bloque(fila_layout, idx_real)
+
+            self._agregar_bloque_especial(fila_layout, "...", "...")
+            self._agregar_bloque(fila_layout, self.capacidad - 1)
+
+        fila_layout.addStretch()
+
+        self.contenedor_layout.addWidget(
+            fila_container, 0, Qt.AlignHCenter
+        )
+        self.filas_info.append({
+            'widget': fila_container,
+            'inicio': inicio,
+            'cantidad': cantidad,
+            'completa': completa
+        })
+
+    def _agregar_bloque(self, layout, idx_real):
+        contenedor = QWidget()
+        contenedor.setFixedWidth(80)
+        layout_vert = QVBoxLayout(contenedor)
+        layout_vert.setSpacing(2)
+        layout_vert.setContentsMargins(0, 0, 0, 0)
+
         cuadro = QLabel("")
         cuadro.setAlignment(Qt.AlignCenter)
-        cuadro.setFixedSize(60, 60)
+        cuadro.setFixedSize(80, 80)
         cuadro.setStyleSheet("""
             QLabel {
                 background-color: #EDE9FE;
                 border: 2px solid #7C3AED;
-                border-radius: 12px;
                 font-size: 16px;
             }
         """)
-        self.grid.addWidget(cuadro, fila, col, alignment=Qt.AlignCenter)
 
         numero = QLabel(str(idx_real + 1))
         numero.setAlignment(Qt.AlignCenter)
-        numero.setStyleSheet("font-size: 14px; color: gray; margin-top: 5px;")
-        self.grid.addWidget(numero, fila + 1, col, alignment=Qt.AlignCenter)
+        numero.setFixedHeight(20)
+        numero.setStyleSheet("font-size: 12px; color: gray; background: transparent;")
+
+        layout_vert.addWidget(cuadro)
+        layout_vert.addWidget(numero)
+
+        layout.addWidget(contenedor)
         self.labels.append(cuadro)
+        self.indices_labels.append(numero)
+        self.indices_reales.append(idx_real)
+
+    def _agregar_bloque_especial(self, layout, texto_valor, texto_indice):
+        contenedor = QWidget()
+        contenedor.setFixedWidth(80)
+        layout_vert = QVBoxLayout(contenedor)
+        layout_vert.setSpacing(2)
+        layout_vert.setContentsMargins(0, 0, 0, 0)
+
+        cuadro = QLabel(texto_valor)
+        cuadro.setAlignment(Qt.AlignCenter)
+        cuadro.setFixedSize(80, 80)
+        cuadro.setStyleSheet("""
+            QLabel {
+                background-color: #F3F4F6;
+                border: 2px solid #9CA3AF;
+                font-size: 24px;
+                color: #6B7280;
+            }
+        """)
+
+        numero = QLabel(texto_indice)
+        numero.setAlignment(Qt.AlignCenter)
+        numero.setFixedHeight(20)
+        numero.setStyleSheet("font-size: 12px; color: gray; background: transparent;")
+
+        layout_vert.addWidget(cuadro)
+        layout_vert.addWidget(numero)
+
+        layout.addWidget(contenedor)
+        self.labels.append(cuadro)
+        self.indices_labels.append(numero)
+        self.indices_reales.append(-1)
 
     def adicionar_claves(self):
         if not self.labels:
-            QMessageBox.warning(self, "Error", "Primero debe crear la estructura.")
+            self._mostrar_mensaje("Error", "Primero debe crear la estructura.")
             return
 
-        dlg = DialogoClave(self.digitos.value(), self)
-        if dlg.exec():
-            clave = dlg.get_clave()
-            if not clave.isdigit():
-                QMessageBox.warning(self, "Error", "La clave debe ser numérica.")
-                return
-            if len(clave) != self.digitos.value():
-                QMessageBox.warning(self, "Error", f"La clave debe tener {self.digitos.value()} dígitos.")
-                return
+        # 👉 Usar el diálogo morado
+        dlg = DialogoClave(
+            self.digitos.value(),
+            titulo="Insertar clave",
+            modo="insertar",
+            parent=self
+        )
+        if not dlg.exec():
+            return
 
-            estado = self.controller.adicionar_clave(clave)
-            if estado == "OK":
-                self.historial.append(clave)
-                self._repintar()
-            elif estado == "REPETIDA":
-                QMessageBox.warning(self, "Clave duplicada", f"La clave {clave} ya fue insertada.")
-            elif estado == "LLENO":
-                QMessageBox.information(self, "Sin espacio", "No hay más espacios disponibles.")
-            elif estado == "LONGITUD":
-                QMessageBox.warning(self, "Error", f"La clave debe tener {self.digitos.value()} dígitos.")
+        clave = dlg.get_clave()
+        if not clave.isdigit():
+            self._mostrar_mensaje("Error", "La clave debe ser numérica.")
+            return
+
+        if len(clave) != self.digitos.value():
+            self._mostrar_mensaje("Error", f"La clave debe tener {self.digitos.value()} dígitos.")
+            return
+
+        estado = self.controller.adicionar_clave(clave)
+
+        if estado == "OK":
+            self.historial.append(clave)
+            self._reconstruir_vista()
+            self._repintar()
+            self._mostrar_mensaje("Éxito", f"La clave {clave} fue insertada correctamente.")
+        elif estado == "REPETIDA":
+            self._mostrar_mensaje("Clave duplicada", f"La clave {clave} ya fue insertada.")
+        elif estado == "LLENO":
+            self._mostrar_mensaje("Sin espacio", "No hay más espacios disponibles.")
+        elif estado == "LONGITUD":
+            self._mostrar_mensaje("Error", f"La clave debe tener {self.digitos.value()} dígitos.")
+
+    def _repintar(self):
+        for i, idx_real in enumerate(self.indices_reales):
+            if idx_real == -1:
+                continue
+
+            lbl = self.labels[i]
+            idx_lbl = self.indices_labels[i]
+
+            val = str(self.controller.estructura.get(idx_real, ""))
+
+            if val:
+                lbl.setText(val)
+                lbl.setStyleSheet("""
+                    QLabel {
+                        background-color: #C4B5FD;
+                        border: 2px solid #6D28D9;
+                        font-size: 16px;
+                        font-weight: bold;
+                    }
+                """)
+            else:
+                lbl.setText("")
+                lbl.setStyleSheet("""
+                    QLabel {
+                        background-color: #EDE9FE;
+                        border: 2px solid #7C3AED;
+                        font-size: 16px;
+                    }
+                """)
+
+            idx_lbl.setText(str(idx_real + 1))
+
+    def buscar_clave(self):
+        if not self.labels:
+            self._mostrar_mensaje("Error", "Primero debe crear o cargar la estructura.")
+            return
+
+        dlg = DialogoClave(
+            self.digitos.value(),
+            titulo="Buscar clave",
+            modo="buscar",
+            parent=self
+        )
+        if not dlg.exec():
+            return
+
+        clave = dlg.clave()
+        if not clave:
+            return
+
+        idx = self.controller.buscar_clave(clave)
+        if idx == -1:
+            self._mostrar_mensaje("No encontrada", f"La clave {clave} no existe en la estructura.")
+            return
+
+        try:
+            pos_label = self.indices_reales.index(idx)
+            self._reset_label_styles()
+            self.labels[pos_label].setStyleSheet("""
+                QLabel {
+                    background-color: #D8B4FE;
+                    border: 3px solid #7C3AED;
+                    font-size: 18px;
+                    font-weight: bold;
+                }
+            """)
+            self._mostrar_mensaje("Resultado", f"La clave {clave} está en la posición {idx + 1}.")
+        except ValueError:
+            self._mostrar_mensaje(
+                "Encontrada (no visible)",
+                f"La clave {clave} está en la posición {idx + 1}, pero no es visible actualmente."
+            )
+
+    def eliminar_clave(self):
+        if not self.labels:
+            self._mostrar_mensaje("Error", "Primero debe crear la estructura.")
+            return
+
+        dlg = DialogoClave(
+            self.digitos.value(),
+            titulo="Eliminar clave",
+            modo="eliminar",
+            parent=self
+        )
+        if not dlg.exec():
+            return
+
+        clave = dlg.get_clave()
+        if not clave:
+            return
+
+        eliminado = self.controller.eliminar_clave(clave)
+        if eliminado:
+            try:
+                self.historial.remove(clave)
+            except ValueError:
+                pass
+
+            # 🔹 Primero mensaje de éxito
+            self._mostrar_mensaje("Éxito", f"Clave {clave} eliminada.")
+
+            # 🔹 Luego reconstruir y repintar
+            self._reconstruir_vista()
+            self._repintar()
+        else:
+            self._mostrar_mensaje("Error", f"La clave {clave} no existe.")
+
+    def deshacer_movimiento(self):
+        if not self.historial:
+            self._mostrar_mensaje("Nada que deshacer", "No hay movimientos previos.")
+            return
+        ultima_clave = self.historial.pop()
+        eliminado = self.controller.eliminar_clave(ultima_clave)
+        if not eliminado:
+            self._mostrar_mensaje("Error", f"No se pudo deshacer la clave {ultima_clave}.")
+            return
+        self._reconstruir_vista()
+        self._repintar()
+        self._mostrar_mensaje("Deshacer", f"Se eliminó la clave {ultima_clave}.")
 
     def eliminar_estructura(self):
         try:
             if not self.labels:
-                QMessageBox.information(self, "Sin estructura", "No hay estructura para eliminar.")
+                self._mostrar_mensaje("Sin estructura", "No hay estructura para eliminar.")
                 return
-            respuesta = QMessageBox.question(
-                self, "Confirmar eliminación",
-                "¿Estás seguro de eliminar la estructura?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-            )
-            if respuesta == QMessageBox.No:
+            if not self._mostrar_confirmacion(
+                    "Confirmar carga",
+                    "Ya existe una estructura cargada.\nSi continúas, será sobreescrita.\n\n¿Deseas continuar?"
+            ):
                 return
-            for i in reversed(range(self.grid.count())):
-                widget = self.grid.itemAt(i).widget()
-                if widget:
-                    widget.setParent(None)
-            self.labels.clear()
+
+            self._limpiar_vista()
             self.capacidad = 0
             self.rango.setCurrentIndex(0)
             self.digitos.setValue(4)
-            QMessageBox.information(self, "Estructura eliminada", "Estructura eliminada con éxito.")
+            self.controller.estructura = {}
+
+            # 🔓 Habilitar rango y dígitos otra vez
+            self.rango.setEnabled(True)
+            self.digitos.setEnabled(True)
+
+            self._mostrar_mensaje("Éxito", "Estructura eliminada con éxito.")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo eliminar la estructura:\n{e}")
+            self._mostrar_mensaje("Error", f"No se pudo eliminar la estructura:\n{e}")
 
     def guardar_estructura(self):
         try:
             capacidad = self.capacidad or 0
             digitos = self.digitos.value()
-            tabla = [lbl.text() if lbl.text() else "" for lbl in self.labels]
+            tabla = {k: v for k, v in self.controller.estructura.items() if v}
             if capacidad == 0:
                 capacidad = len(tabla)
             datos = {
@@ -410,156 +534,70 @@ class LinealInterna(QMainWindow):
             if not ruta.lower().endswith(".json"):
                 ruta += ".json"
             ManejadorArchivos.guardar_json(ruta, datos)
-            QMessageBox.information(self, "Éxito", f"Estructura guardada en:\n{ruta}")
+            self._mostrar_mensaje("Éxito", f"Estructura guardada en:\n{ruta}")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar la estructura:\n{e}")
+            self._mostrar_mensaje("Error", f"No se pudo guardar la estructura:\n{e}")
 
-    def deshacer_movimiento(self):
-        if not self.historial:
-            QMessageBox.information(self, "Nada que deshacer", "No hay movimientos previos.")
-            return
-        ultima_clave = self.historial.pop()
-        eliminado = self.controller.eliminar_clave(ultima_clave)
-        if not eliminado:
-            QMessageBox.warning(self, "Error", f"No se pudo deshacer la clave {ultima_clave}.")
-            return
-        self._repintar()
-        QMessageBox.information(self, "Deshacer", f"Se eliminó la clave {ultima_clave}.")
-
-    def eliminar_clave(self):
-        if not self.labels:
-            QMessageBox.warning(self, "Error", "Primero debe crear la estructura.")
-            return
-
-        clave, ok = QInputDialog.getText(self, "Eliminar clave", "Ingrese la clave a eliminar:")
-        if not ok or not clave:
-            return
-
-        eliminado = self.controller.eliminar_clave(clave)
-        if eliminado:
-            # si existía, actualizar vista y también historial si corresponde
-            try:
-                # quitar de historial si estaba
-                self.historial.remove(clave)
-            except ValueError:
-                pass
-
-            self._repintar()
-            QMessageBox.information(self, "Éxito", f"Clave {clave} eliminada.")
-        else:
-            QMessageBox.warning(self, "Error", f"La clave {clave} no existe.")
-
-    def buscar_clave(self):
-        if not self.labels:
-            QMessageBox.warning(self, "Error", "Primero debe crear o cargar la estructura.")
-            return
-
-        clave, ok = QInputDialog.getText(self, "Buscar clave", "Ingrese la clave a buscar:")
-        if not ok or not clave:
-            return
-
-        # pedir índice real (0-based) al controller
-        idx = self.controller.buscar_clave(clave)  # debe devolver 0-based o -1
-
-        if idx == -1:
-            QMessageBox.warning(self, "No encontrada", f"La clave {clave} no existe en la estructura.")
-            return
-
-        # mapear ese índice real a la posición en labels (si está visible)
-        label_pos = self._map_index_to_label(idx)
-        if label_pos is None:
-            # existe en la estructura pero no está en la porción visible
-            QMessageBox.information(
-                self, "Encontrada (no visible)",
-                f"La clave {clave} está en la posición {idx + 1}, pero no es visible en la representación actual."
-            )
-            return
-
-        # limpiar resaltados previos y luego resaltar en morado
-        self._reset_label_styles()
-        highlight_style = """
-            QLabel {
-                background-color: #D8B4FE;  /* morado claro */
-                border: 3px solid #7C3AED;  /* morado oscuro */
-                border-radius: 12px;
-                font-size: 18px;
-                font-weight: bold;
-            }
-        """
-        self.labels[label_pos].setStyleSheet(highlight_style)
-
-        # mostrar posición 1-based al usuario
-        QMessageBox.information(self, "Resultado", f"La clave {clave} está en la posición {idx + 1}.")
-
-    def _repintar(self):
-        """
-        Pinta la vista *según la estructura real* del controller.
-        Esto evita inconsistencias entre lo que busca el controller y lo que muestra la UI.
-        """
-        # indices reales que corresponden a cada label visible
-        visibles = self._get_visible_indices()
-
-        for pos_label, idx_real in enumerate(visibles):
-            lbl = self.labels[pos_label]
-            val = str(self.controller.estructura.get(idx_real, "") if self.controller.estructura is not None else "")
-            if val:
-                lbl.setText(val)
-                lbl.setStyleSheet("""
-                    QLabel {
-                        background-color: #C4B5FD;
-                        border: 2px solid #6D28D9;
-                        border-radius: 12px;
-                        font-size: 18px;
-                        font-weight: bold;
-                    }
-                """)
-            else:
-                lbl.setText("")
-                lbl.setStyleSheet("""
-                    QLabel {
-                        background-color: #EDE9FE;
-                        border: 2px solid #A78BFA;
-                        border-radius: 12px;
-                        font-size: 18px;
-                    }
-                """)
-
-    def _get_visible_indices(self):
-        """
-        Devuelve la lista de índices reales (0-based) de la estructura que están
-        representados por self.labels (en orden). Useful para repintar.
-        """
-        if self.capacidad <= 1000:
-            return list(range(self.capacidad))
-        # misma lógica que usas para mostrar: primeros mostrar_inicio y últimos mostrar_final
-        mostrar_inicio = getattr(self, "mostrar_inicio", 50)
-        mostrar_final = getattr(self, "mostrar_final", 50)
-        primeros = list(range(0, min(mostrar_inicio, self.capacidad)))
-        ultimos = list(range(max(0, self.capacidad - mostrar_final), self.capacidad))
-        return primeros + ultimos
-
-    def _map_index_to_label(self, idx):
-        """
-        Mapear un índice real (0-based) de la estructura a la posición en self.labels.
-        Devuelve None si ese índice no está en la porción visible.
-        """
-        visibles = self._get_visible_indices()
+    def cargar_estructura(self):
         try:
-            return visibles.index(idx)
-        except ValueError:
-            return None
+            if self.labels or self.capacidad:
+                if not self._mostrar_confirmacion(
+                        "Confirmar carga",
+                        "Ya existe una estructura cargada.\nSi continúas, será sobreescrita.\n\n¿Deseas continuar?"
+                ):
+                    return
+
+            archivo, _ = QFileDialog.getOpenFileName(
+                self, "Seleccionar archivo JSON", "", "JSON (*.json)"
+            )
+            if not archivo:
+                return
+
+            datos = ManejadorArchivos.leer_json(archivo)
+            if not datos:
+                self._mostrar_mensaje("Error", "Archivo inválido o vacío.")
+                return
+
+            rango = datos.get("rango")
+            digitos = datos.get("digitos", self.digitos.value())
+            capacidad = datos.get("capacidad", 0)
+            claves = datos.get("claves", {})
+
+            self.controller.crear_estructura(capacidad, digitos)
+
+            if isinstance(claves, dict):
+                for k, v in claves.items():
+                    idx = int(k)
+                    if v:
+                        self.controller.estructura[idx] = str(v)
+
+            self.controller.guardar()
+            self.capacidad = capacidad
+
+            if rango:
+                idx_combo = self.rango.findText(rango)
+                if idx_combo != -1:
+                    self.rango.setCurrentIndex(idx_combo)
+            self.digitos.setValue(digitos)
+
+            self._reconstruir_vista()
+            self._repintar()
+
+            self._mostrar_mensaje("Éxito", "Estructura cargada correctamente")
+        except Exception as e:
+            self._mostrar_mensaje("Error", f"No se pudo cargar la estructura:\n{e}")
 
     def _reset_label_styles(self):
-        """Restaura estilos por defecto de todos los labels sin cambiar su texto."""
-        for lbl in self.labels:
+        for i, lbl in enumerate(self.labels):
+            if self.indices_reales[i] == -1:
+                continue
             text = lbl.text()
             if text:
                 lbl.setStyleSheet("""
                     QLabel {
                         background-color: #C4B5FD;
                         border: 2px solid #6D28D9;
-                        border-radius: 12px;
-                        font-size: 18px;
+                        font-size: 16px;
                         font-weight: bold;
                     }
                 """)
@@ -567,10 +605,22 @@ class LinealInterna(QMainWindow):
                 lbl.setStyleSheet("""
                     QLabel {
                         background-color: #EDE9FE;
-                        border: 2px solid #A78BFA;
-                        border-radius: 12px;
-                        font-size: 18px;
+                        border: 2px solid #7C3AED;
+                        font-size: 16px;
                     }
                 """)
 
+    def _mostrar_mensaje(self, titulo, texto):
+        dlg = DialogoClave(
+            longitud=0,
+            titulo=titulo,
+            modo="mensaje",
+            parent=self,
+            mensaje=texto
+        )
+        dlg.exec()
+
+    def _mostrar_confirmacion(self, titulo, texto):
+        dlg = DialogoClave(0, titulo, modo="confirmar", parent=self, mensaje=texto)
+        return dlg.exec() == QDialog.Accepted
 
