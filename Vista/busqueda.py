@@ -1,6 +1,10 @@
 from Vista.lineal_interna import LinealInterna
 from Vista.binaria_interna import BinariaInterna
 from Vista.mod_interna import ModInterna
+from Vista.cuadrado_interna import CuadradoInterna
+from Vista.truncamiento_interna import TruncamientoInterna
+from Vista.plegamiento_interna import PlegamientoInterna
+
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
@@ -101,12 +105,22 @@ class Busqueda(QMainWindow):
         # Submenú "Funciones Hash" (aparece al poner el mouse encima)
         submenu_hash = QMenu("Funciones Hash", self)
         submenu_hash.addAction("Función mod", self.abrir_mod)
-        submenu_hash.addAction("Función cuadrado", lambda t="Función cuadrado": self.mostrar_opcion(t))
-        submenu_hash.addAction("Función truncamiento", lambda t="Función truncamiento": self.mostrar_opcion(t))
-        submenu_hash.addAction("Función plegamiento", lambda t="Función plegamiento": self.mostrar_opcion(t))
+        submenu_hash.addAction("Función cuadrado", self.abrir_cuadrado)
+        submenu_hash.addAction("Función truncamiento",  self.abrir_truncamiento)
+        submenu_hash.addAction("Función plegamiento", self.abrir_plegamiento)
 
         menu_internas.addMenu(submenu_hash)
-        menu_internas.addAction("Otras", lambda t="Otras": self.mostrar_opcion(t))
+        # 🌲 Submenú Árboles
+        submenu_arboles = QMenu("Otras", self)
+       # submenu_arboles.addAction("Búsqueda por residuos", self.abrir_busqueda_residuos)
+        submenu_arboles.addAction("Árboles digitales", self.abrir_arboles_digitales)
+        submenu_arboles.addAction("Tries (residuos)", self.abrir_tries_residuos)
+        submenu_arboles.addAction("Residuos múltiples", self.abrir_multiples_residuos)
+        submenu_arboles.addAction("Árboles Huffman", self.abrir_arboles_huffman)
+
+        menu_internas.addMenu(submenu_arboles)
+
+
 
         # Añadimos como acción raíz para que el texto del botón no cambie
         busquedas_action = menu_bar.addAction("🔎 Búsquedas Internas")
@@ -147,3 +161,27 @@ class Busqueda(QMainWindow):
 
     def abrir_mod(self):
         self.cambiar_ventana("mod_interna")
+
+    def abrir_cuadrado(self):
+        self.cambiar_ventana("cuadrado_interna")
+
+    def abrir_truncamiento(self):
+        self.cambiar_ventana("truncamiento_interna")  # ✅ abre la nueva pestaña
+
+    def abrir_plegamiento(self):
+        self.cambiar_ventana("plegamiento_interna")
+
+    def abrir_busqueda_residuos(self):
+        self.cambiar_ventana("busqueda_residuos")
+
+    def abrir_arboles_digitales(self):
+        self.cambiar_ventana("arboles_digitales")
+
+    def abrir_tries_residuos(self):
+        self.cambiar_ventana("tries_residuos")
+
+    def abrir_multiples_residuos(self):
+        self.cambiar_ventana("multiples_residuos")
+
+    def abrir_arboles_huffman(self):
+        self.cambiar_ventana("arboles_huffman")

@@ -92,3 +92,72 @@ class LinealController:
     def get_claves(self):
         """Devuelve la lista de claves actuales, ordenadas, sin vacíos."""
         return [v for v in self.estructura.values() if v != ""]
+
+    def buscar_clave(self, clave: str) -> int:
+        """Devuelve índice 0-based donde está la clave, o -1 si no existe."""
+        clave = str(clave).strip()
+        # comparación directa por string
+        for i in range(self.capacidad):
+            if str(self.estructura.get(i, "")).strip() == clave:
+                return i
+        # intento por entero (por si hay diferencias de formato: '0008' vs '8')
+        try:
+            k = int(clave)
+            for i in range(self.capacidad):
+                val = self.estructura.get(i, "")
+                if val != "":
+                    try:
+                        if int(str(val).strip()) == k:
+                            return i
+                    except ValueError:
+                        pass
+        except ValueError:
+            pass
+        return -1
+
+    def eliminar_clave(self, clave: str) -> bool:
+        """
+        Elimina la clave si existe. Reordena la estructura (como hace agregar_clave)
+        y guarda. Devuelve True si se eliminó, False si no se encontró.
+        """
+        clave = str(clave).strip()
+
+        # 1) buscar por igualdad directa
+        for i in range(self.capacidad):
+            if str(self.estructura.get(i, "")).strip() == clave:
+                self.estructura[i] = ""
+                # reordenar las restantes (mantener la lógica que ya usas al insertar)
+                restantes = [v for v in self.estructura.values() if v != ""]
+                try:
+                    restantes = sorted(restantes, key=lambda x: int(x))
+                except Exception:
+                    restantes = list(restantes)
+                self.estructura = {j: (restantes[j] if j < len(restantes) else "") for j in range(self.capacidad)}
+                self.guardar()
+                return True
+
+        # 2) si no, intentar por valor numérico (por si la representación cambió)
+        try:
+            k = int(clave)
+            for i in range(self.capacidad):
+                val = self.estructura.get(i, "")
+                if val != "":
+                    try:
+                        if int(str(val).strip()) == k:
+                            self.estructura[i] = ""
+                            restantes = [v for v in self.estructura.values() if v != ""]
+                            try:
+                                restantes = sorted(restantes, key=lambda x: int(x))
+                            except Exception:
+                                restantes = list(restantes)
+                            self.estructura = {j: (restantes[j] if j < len(restantes) else "") for j in
+                                               range(self.capacidad)}
+                            self.guardar()
+                            return True
+                    except ValueError:
+                        pass
+        except ValueError:
+            pass
+
+        return False
+
