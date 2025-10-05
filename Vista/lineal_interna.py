@@ -8,6 +8,7 @@ from .dialogo_clave import DialogoClave
 from Controlador.Internas.lineal_controller import LinealController
 from Modelo.manejador_archivos import ManejadorArchivos
 from datetime import datetime
+import os
 
 
 class LinealInterna(QMainWindow):
@@ -356,7 +357,7 @@ class LinealInterna(QMainWindow):
         estado = self.controller.adicionar_clave(clave)
 
         if estado == "OK":
-            self.historial.append(clave)
+            self.historial.append(("insertar", clave))
             self._reconstruir_vista()
             self._repintar()
             self._mostrar_mensaje("Éxito", f"La clave {clave} fue insertada correctamente.")
@@ -460,10 +461,8 @@ class LinealInterna(QMainWindow):
 
         eliminado = self.controller.eliminar_clave(clave)
         if eliminado:
-            try:
-                self.historial.remove(clave)
-            except ValueError:
-                pass
+            self.historial.append(("eliminar", clave))  # ✅ registrar eliminación
+
 
             # 🔹 Primero mensaje de éxito
             self._mostrar_mensaje("Éxito", f"Clave {clave} eliminada.")
@@ -478,37 +477,60 @@ class LinealInterna(QMainWindow):
         if not self.historial:
             self._mostrar_mensaje("Nada que deshacer", "No hay movimientos previos.")
             return
-        ultima_clave = self.historial.pop()
-        eliminado = self.controller.eliminar_clave(ultima_clave)
-        if not eliminado:
-            self._mostrar_mensaje("Error", f"No se pudo deshacer la clave {ultima_clave}.")
-            return
-        self._reconstruir_vista()
-        self._repintar()
-        self._mostrar_mensaje("Deshacer", f"Se eliminó la clave {ultima_clave}.")
+
+        movimiento = self.historial.pop()
+
+        # 🧩 compatibilidad con versiones viejas
+        if isinstance(movimiento, tuple) and len(movimiento) == 2:
+            tipo, clave = movimiento
+        else:
+            tipo, clave = "insertar", movimiento  # asumir que era una inserción
+
+        if tipo == "insertar":
+            exito = self.controller.eliminar_clave(clave)
+            if exito:
+                self.historial.append(("eliminar", clave))
+                self._reconstruir_vista()
+                self._repintar()
+                self._mostrar_mensaje("Deshacer", f"Se eliminó la clave {clave}.")
+            else:
+                self._mostrar_mensaje("Error", f"No se pudo eliminar la clave {clave} al deshacer.")
+        elif tipo == "eliminar":
+            resultado = self.controller.agregar_clave(clave)
+            if resultado == "OK":
+                self.historial.append(("insertar", clave))
+                self._reconstruir_vista()
+                self._repintar()
+                self._mostrar_mensaje("Deshacer", f"Se restauró la clave {clave}.")
+            else:
+                self._mostrar_mensaje("Error", f"No se pudo restaurar la clave {clave}: {resultado}.")
 
     def eliminar_estructura(self):
+        """Elimina la estructura actual solo en memoria y en la vista (no el archivo)."""
         try:
-            if not self.labels:
-                self._mostrar_mensaje("Sin estructura", "No hay estructura para eliminar.")
-                return
+            # Confirmación opcional
             if not self._mostrar_confirmacion(
-                    "Confirmar carga",
-                    "Ya existe una estructura cargada.\nSi continúas, será sobreescrita.\n\n¿Deseas continuar?"
+                    "Confirmar eliminación",
+                    "⚠️ Cuidado: estás a punto de eliminar la estructura visual.\n\n¿Deseas continuar?"
             ):
                 return
 
-            self._limpiar_vista()
-            self.capacidad = 0
-            self.rango.setCurrentIndex(0)
-            self.digitos.setValue(4)
+            # Resetear datos en memoria
             self.controller.estructura = {}
+            self.controller.capacidad = 0
+            self.controller.digitos = 0
 
-            # 🔓 Habilitar rango y dígitos otra vez
+            # Limpiar la vista
+            self._limpiar_vista()
+            self._repintar()
+            self.labels = []
+            self.capacidad = 0
+
+            # Reactivar controles si los tenías deshabilitados
             self.rango.setEnabled(True)
             self.digitos.setEnabled(True)
 
-            self._mostrar_mensaje("Éxito", "Estructura eliminada con éxito.")
+            self._mostrar_mensaje("Éxito", "La estructura visual fue eliminada correctamente.")
         except Exception as e:
             self._mostrar_mensaje("Error", f"No se pudo eliminar la estructura:\n{e}")
 
