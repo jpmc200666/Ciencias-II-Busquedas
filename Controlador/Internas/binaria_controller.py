@@ -25,7 +25,7 @@ class BinariaController:
         clave = str(clave)
 
         # Solo números y sin ceros iniciales
-        if not clave.isdigit() or clave[0] == "0":
+        if not clave.isdigit():
             return "NO_NUMERICA"
 
         if len(clave) != self.digitos:

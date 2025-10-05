@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
-    QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox, QHBoxLayout, QDialog, QFileDialog, QMessageBox
+    QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea, QHBoxLayout, QDialog, QFileDialog
 )
 from PySide6.QtCore import Qt
 from .dialogo_clave import DialogoClave
@@ -13,13 +12,14 @@ class BinariaInterna(QMainWindow):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
         self.controller = BinariaController()
-
+        self.cuadro_resaltado = None
         self.setWindowTitle("Ciencias de la Computación II - Búsqueda Binaria")
 
         # --- Layout principal ---
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
 
         # --- Encabezado ---
         header = QFrame()
@@ -31,13 +31,13 @@ class BinariaInterna(QMainWindow):
             border-radius: 12px;
         """)
         header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(10, 10, 10, 10)
 
         titulo = QLabel("Ciencias de la Computación II - Búsqueda Binaria")
         titulo.setAlignment(Qt.AlignCenter)
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
 
-        # --- Menú debajo del título ---
         menu_layout = QHBoxLayout()
         menu_layout.setSpacing(40)
         menu_layout.setAlignment(Qt.AlignCenter)
@@ -67,14 +67,34 @@ class BinariaInterna(QMainWindow):
 
         layout.addWidget(header)
 
-        # --- Controles superiores ---
+        # --- Controles superiores (Rango y Dígitos) ---
+        controles_layout = QHBoxLayout()
+        controles_layout.setAlignment(Qt.AlignCenter)
+        controles_layout.setSpacing(20)
+
+        lbl_rango = QLabel("Rango (10^n):")
+        lbl_rango.setStyleSheet("font-weight: bold; font-size: 14px;")
+
         self.rango = QComboBox()
-        self.rango.addItems([f"10^{i}" for i in range(1, 6)])
+        self.rango.addItems([str(i) for i in range(1, 6)])
+        self.rango.setFixedWidth(80)
+
+        lbl_digitos = QLabel("Número de dígitos:")
+        lbl_digitos.setStyleSheet("font-weight: bold; font-size: 14px;")
+
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
+        self.digitos.setFixedWidth(80)
 
-        # Botones principales
+        controles_layout.addWidget(lbl_rango)
+        controles_layout.addWidget(self.rango)
+        controles_layout.addWidget(lbl_digitos)
+        controles_layout.addWidget(self.digitos)
+
+        layout.addLayout(controles_layout)
+
+        # --- Botones principales ---
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_agregar = QPushButton("Insertar claves")
         self.btn_buscar = QPushButton("Buscar clave")
@@ -84,8 +104,10 @@ class BinariaInterna(QMainWindow):
         self.btn_eliminar = QPushButton("Eliminar estructura")
         self.btn_cargar = QPushButton("Cargar estructura")
 
-        for btn in (self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_eliminar_clave,
-                    self.btn_deshacer, self.btn_guardar, self.btn_eliminar, self.btn_cargar):
+        for btn in (
+            self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_eliminar_clave,
+            self.btn_deshacer, self.btn_guardar, self.btn_eliminar, self.btn_cargar
+        ):
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
@@ -99,14 +121,8 @@ class BinariaInterna(QMainWindow):
                 }
             """)
 
-        # Layout de controles
-        self.controles = QVBoxLayout()
-        self.controles.addWidget(QLabel("Rango (10^n):"))
-        self.controles.addWidget(self.rango)
-        self.controles.addWidget(QLabel("Número de dígitos de la clave:"))
-        self.controles.addWidget(self.digitos)
-
         grid_botones = QGridLayout()
+        grid_botones.setSpacing(20)
         grid_botones.addWidget(self.btn_crear,          0, 0)
         grid_botones.addWidget(self.btn_agregar,        0, 1)
         grid_botones.addWidget(self.btn_buscar,         0, 2)
@@ -116,8 +132,7 @@ class BinariaInterna(QMainWindow):
         grid_botones.addWidget(self.btn_eliminar,       1, 2)
         grid_botones.addWidget(self.btn_cargar,         1, 3)
 
-        self.controles.addLayout(grid_botones)
-        layout.addLayout(self.controles)
+        layout.addLayout(grid_botones)
 
         # --- Contenedor con scroll ---
         self.scroll = QScrollArea()
@@ -147,24 +162,23 @@ class BinariaInterna(QMainWindow):
     # --- Métodos básicos ---
     def crear_estructura(self):
         # Limpia y crea la estructura vacía
+        self.limpiar_resaltado()
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
         self.labels.clear()
 
-        n = int(self.rango.currentText().split("^")[1])
+        n = int(self.rango.currentText())
         capacidad = 10 ** n
         self.capacidad = capacidad
 
         self.controller.crear_estructura(capacidad, self.digitos.value())
 
         if capacidad > 1000:
-            QMessageBox.information(
-                self, "Vista representativa",
-                f"La capacidad real es {capacidad}, "
-                "pero solo se muestra parcialmente."
-            )
+            DialogoClave(0, titulo="Vista representativa", modo="mensaje", parent=self,
+                         mensaje=f"La capacidad real es {capacidad}, pero solo se muestra parcialmente.").exec()
+
             mostrar = 50
             for i in range(mostrar):
                 self._agregar_cuadro(i, i)
@@ -182,7 +196,12 @@ class BinariaInterna(QMainWindow):
             for i in range(capacidad):
                 self._agregar_cuadro(i, i)
 
+        # --- Bloquear los controles una vez creada la estructura ---
+        self.rango.setEnabled(False)
+        self.digitos.setEnabled(False)
+
     def _agregar_cuadro(self, i, idx_real):
+        self.limpiar_resaltado()
         fila = (i // 10) * 2
         col = i % 10
 
@@ -207,8 +226,9 @@ class BinariaInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
+        self.limpiar_resaltado()
         if self.capacidad == 0:
-            QMessageBox.warning(self, "Error", "Primero cree la estructura.")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self, mensaje="Primero cree la estructura.").exec()
             return
 
         dialogo = DialogoClave(self.digitos.value(), "Insertar clave", parent=self)
@@ -225,15 +245,20 @@ class BinariaInterna(QMainWindow):
                         self.labels[i].setText(clave)
 
             elif resultado == "LONGITUD":
-                QMessageBox.warning(self, "Error", "La clave no cumple con la longitud definida.")
+                DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                             mensaje="La clave no cumple con la longitud definida.").exec()
             elif resultado == "REPETIDA":
-                QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
+                DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                             mensaje="La clave ya existe en la estructura.").exec()
             elif resultado == "LLENO":
-                QMessageBox.warning(self, "Error", "La estructura ya está llena.")
+                DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                             mensaje="La estructura ya está llena.").exec()
 
     def buscar_clave(self):
+        self.limpiar_resaltado()
         if self.capacidad == 0:
-            QMessageBox.warning(self, "Error", "Primero cree la estructura.")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                         mensaje="Primero cree la estructura.").exec()
             return
 
         dialogo = DialogoClave(self.digitos.value(), self)
@@ -252,6 +277,18 @@ class BinariaInterna(QMainWindow):
                 """)
 
             if pos != -1 and pos < len(self.labels):
+                # Despintar anterior
+                if self.cuadro_resaltado:
+                    self.cuadro_resaltado.setStyleSheet("""
+                        QLabel {
+                            background-color: #EDE9FE;
+                            border: 2px solid #7C3AED;
+                            border-radius: 12px;
+                            font-size: 16px;
+                        }
+                    """)
+
+                # Pintar nuevo cuadro
                 self.labels[pos].setStyleSheet("""
                     QLabel {
                         background-color: #C084FC;
@@ -261,13 +298,20 @@ class BinariaInterna(QMainWindow):
                         font-weight: bold;
                     }
                 """)
-                QMessageBox.information(self, "Éxito", f"Clave encontrada en posición {pos + 1}")
+                self.cuadro_resaltado = self.labels[pos]
+
+                DialogoClave(0, titulo="Éxito", modo="mensaje", parent=self,
+                             mensaje=f"Clave encontrada en posición {pos + 1}").exec()
             else:
-                QMessageBox.warning(self, "No encontrado", "La clave no está en la estructura.")
+                DialogoClave(0, titulo="No encontrado", modo="mensaje", parent=self,
+                             mensaje="La clave no está en la estructura.").exec()
+                self.cuadro_resaltado = None
 
     def eliminar_clave(self):
+        self.limpiar_resaltado()
         if self.capacidad == 0:
-            QMessageBox.warning(self, "Error", "Primero cree la estructura.")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                         mensaje="Primero cree la estructura.").exec()
             return
 
         dialogo = DialogoClave(self.digitos.value(), self)
@@ -284,24 +328,62 @@ class BinariaInterna(QMainWindow):
                         lbl.setText(lista[i])
                     else:
                         lbl.setText("")
-                QMessageBox.information(self, "Éxito", "Clave eliminada correctamente.")
-            else:
-                QMessageBox.warning(self, "Error", "La clave no existe en la estructura.")
+
+                # 🔹 Despintar cuadro resaltado si existía
+                if self.cuadro_resaltado:
+                    self.cuadro_resaltado.setStyleSheet("""
+                        QLabel {
+                            background-color: #EDE9FE;
+                            border: 2px solid #7C3AED;
+                            border-radius: 12px;
+                            font-size: 16px;
+                        }
+                    """)
+                    self.cuadro_resaltado = None
+
+                DialogoClave(0, titulo="Éxito", modo="mensaje", parent=self,
+                             mensaje="Clave eliminada correctamente.").exec()
 
     def eliminar_estructura(self):
+        # --- Confirmar eliminación ---
+        confirmar = DialogoClave(
+            0,
+            titulo="Confirmar eliminación",
+            modo="confirmar",
+            parent=self,
+            mensaje="¿Está seguro de que desea eliminar la estructura actual?"
+        )
+        if confirmar.exec() != QDialog.Accepted:
+            return  # Canceló la acción
+
+        # --- Proceder a eliminar ---
+        self.limpiar_resaltado()
         self.controller = BinariaController()
         self.capacidad = 0
 
+        # Limpiar el grid visual
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
 
         self.labels.clear()
-        QMessageBox.information(self, "Éxito", "La estructura ha sido eliminada.")
+
+        DialogoClave(
+            0,
+            titulo="Éxito",
+            modo="mensaje",
+            parent=self,
+            mensaje="La estructura ha sido eliminada correctamente."
+        ).exec()
+
+        # --- Volver a habilitar controles ---
+        self.rango.setEnabled(True)
+        self.digitos.setEnabled(True)
 
     # --- Métodos extra ---
     def deshacer(self):
+        self.limpiar_resaltado()
         """Revierte la última acción realizada (insertar/eliminar clave)."""
         resultado = self.controller.deshacer()
         if resultado == "OK":
@@ -315,11 +397,14 @@ class BinariaInterna(QMainWindow):
                 else:
                     lbl.setText("")
 
-            QMessageBox.information(self, "Éxito", "Se deshizo el último movimiento.")
+            DialogoClave(0, titulo="Éxito", modo="mensaje", parent=self,
+                         mensaje="Se deshizo el último movimiento.").exec()
         else:
-            QMessageBox.warning(self, "Error", "No hay movimientos para deshacer.")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                         mensaje="No hay movimientos para deshacer.").exec()
 
     def guardar_estructura(self):
+        self.limpiar_resaltado()
         """Abre explorador de archivos para guardar la estructura en JSON con nombre por defecto."""
         ruta, _ = QFileDialog.getSaveFileName(
             self,
@@ -332,24 +417,21 @@ class BinariaInterna(QMainWindow):
 
         resultado = self.controller.guardar(ruta)
         if resultado == "OK":
-            QMessageBox.information(self, "Éxito", f"Estructura guardada en:\n{ruta}")
+            DialogoClave(0, titulo="Éxito", modo="mensaje", parent=self,
+                         mensaje=f"Estructura guardada en:\n{ruta}").exec()
         else:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar la estructura:\n{resultado}")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                         mensaje=f"No se pudo guardar la estructura:\n{resultado}").exec()
 
     def cargar_estructura(self):
+        self.limpiar_resaltado()
         """Abre explorador de archivos para cargar la estructura en JSON."""
         # advertencia antes de sobrescribir
         if self.controller.estructura:
-            resp = QMessageBox.warning(
-                self,
-                "Advertencia",
-                "Se sobrescribirá la estructura actual.\n\n"
-                "¿Desea continuar?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if resp != QMessageBox.Yes:
-                return  # cancelar
+            dialogo = DialogoClave(0, titulo="Advertencia", modo="confirmar", parent=self,
+                                   mensaje="Se sobrescribirá la estructura actual.\n\n¿Desea continuar?")
+            if dialogo.exec() != QDialog.Accepted:
+                return
 
         ruta, _ = QFileDialog.getOpenFileName(
             self,
@@ -399,6 +481,20 @@ class BinariaInterna(QMainWindow):
                 if i < len(self.labels):
                     self.labels[i].setText(clave)
 
-            QMessageBox.information(self, "Éxito", "Estructura cargada correctamente.")
+            DialogoClave(0, titulo="Éxito", modo="mensaje", parent=self,
+                         mensaje="Estructura cargada correctamente.").exec()
         else:
-            QMessageBox.critical(self, "Error", f"No se pudo cargar la estructura:\n{resultado}")
+            DialogoClave(0, titulo="Error", modo="mensaje", parent=self,
+                         mensaje=f"No se pudo cargar la estructura:\n{resultado}").exec()
+
+    def limpiar_resaltado(self):
+        """Restaura el color normal de todos los cuadros."""
+        for lbl in self.labels:
+            lbl.setStyleSheet("""
+                QLabel {
+                    background-color: #EDE9FE;
+                    border: 2px solid #7C3AED;
+                    border-radius: 12px;
+                    font-size: 16px;
+                }
+            """)
