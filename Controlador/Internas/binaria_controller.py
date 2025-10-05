@@ -22,6 +22,12 @@ class BinariaController:
         return True
 
     def adicionar_clave(self, clave: str):
+        clave = str(clave)
+
+        # Solo números y sin ceros iniciales
+        if not clave.isdigit() or clave[0] == "0":
+            return "NO_NUMERICA"
+
         if len(clave) != self.digitos:
             return "LONGITUD"
         if clave in self.estructura.values():
@@ -29,12 +35,11 @@ class BinariaController:
         if len(self.estructura) >= self.capacidad:
             return "LLENO"
 
-        # Guardamos estado antes de modificar
         self._guardar_estado()
 
         lista = list(self.estructura.values())
         lista.append(clave)
-        lista.sort()
+        lista.sort(key=int)  # orden numérico real
         self.estructura = {i: lista[i] for i in range(len(lista))}
         return "OK"
 

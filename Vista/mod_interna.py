@@ -213,7 +213,12 @@ class ModInterna(QMainWindow):
             return
 
         # Obtener la clave del usuario
-        dialogo = DialogoClave(self.digitos.value(), self)
+        dialogo = dialogo = DialogoClave(
+            longitud=self.digitos.value(),
+            titulo=f"Clave de {self.digitos.value()} dígitos",
+            modo="insertar",
+            parent=self
+        )
         if dialogo.exec() != QDialog.Accepted:
             return
 
@@ -328,7 +333,7 @@ class ModInterna(QMainWindow):
 
     def guardar_estructura(self):
         # sugerimos nombre por defecto
-        nombre_defecto = "interna_binaria.json"
+        nombre_defecto = "mod_interna.json"
         ruta, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar estructura",
