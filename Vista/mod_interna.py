@@ -213,7 +213,12 @@ class ModInterna(QMainWindow):
             return
 
         # Obtener la clave del usuario
-        dialogo = DialogoClave(self.digitos.value(), self)
+        dialogo = DialogoClave(
+            longitud=self.digitos.value(),
+            titulo=f"Clave de {self.digitos.value()} dígitos",
+            modo="insertar",
+            parent=self
+        )
         if dialogo.exec() != QDialog.Accepted:
             return
 

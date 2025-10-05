@@ -42,10 +42,11 @@ class ModController:
             return "LONGITUD"
 
         # Verificar si la clave ya existe
-        if str(clave) in [str(v) for v in self.estructura.values() if v]:
+        if clave in [v for v in self.estructura.values() if v]:
             return "REPETIDA"
 
         try:
+            # ⚠️ Usa la conversión solo para calcular la posición hash
             clave_int = int(clave)
 
             # Guardar estado antes de insertar
@@ -57,22 +58,26 @@ class ModController:
             # Verificar si hay colisión
             if self.colisiones_controller.estructura[pos_base] is None:
                 # No hay colisión, insertar directamente
-                self.colisiones_controller.estructura[pos_base] = clave_int
-                self.estructura[pos_base + 1] = str(clave)  # +1 porque estructura inicia en 1
+                self.colisiones_controller.estructura[pos_base] = clave_int  # versión numérica interna
+                self.estructura[pos_base + 1] = clave  # 👈 guarda el texto original con ceros
                 self.guardar()
                 return "OK"
             else:
                 # HAY COLISIÓN
                 if estrategia is None:
-                    # No se especificó estrategia, retornar para que la vista maneje
-                    self.historial.pop()  # descartar el estado guardado
+                    self.historial.pop()
                     return "COLISION"
 
-                # Se especificó estrategia, resolver colisión
+                # Resolver colisión con estrategia
                 pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
-
-                # Sincronizar con estructura visible
                 self._sincronizar_estructura()
+
+                # 🔧 Corrige visualmente para mostrar siempre los ceros originales
+                for i in range(1, self.capacidad + 1):
+                    valor = self.estructura[i]
+                    if str(valor).isdigit():
+                        self.estructura[i] = str(valor).zfill(self.digitos)
+
                 self.guardar()
                 return "OK"
 
