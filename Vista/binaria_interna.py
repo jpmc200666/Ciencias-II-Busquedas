@@ -211,7 +211,7 @@ class BinariaInterna(QMainWindow):
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
-        dialogo = DialogoClave(self.digitos.value(), self)
+        dialogo = DialogoClave(self.digitos.value(), "Insertar clave", parent=self)
         if dialogo.exec() == QDialog.Accepted:
             clave = dialogo.get_clave()
             resultado = self.controller.adicionar_clave(clave)

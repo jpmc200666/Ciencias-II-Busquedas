@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
-    QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox, QHBoxLayout, QLineEdit
+    QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame, QComboBox, QSpinBox,
+    QPushButton, QGridLayout, QScrollArea, QMessageBox, QHBoxLayout, QDialog, QInputDialog, QFileDialog
 )
 from PySide6.QtCore import Qt
-from .dialogo_clave import DialogoClave
+
 from Controlador.Internas.truncamiento_controller import TruncamientoController
-from .dialogo_posiciones import DialogoPosiciones
+from Vista.dialogo_clave import DialogoClave
+from Vista.dialogo_posiciones import DialogoPosiciones
 
 
 class TruncamientoInterna(QMainWindow):
@@ -14,15 +14,17 @@ class TruncamientoInterna(QMainWindow):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
         self.controller = TruncamientoController()
+        self.labels = []
+        self.capacidad = 0
 
-        self.setWindowTitle("Ciencias de la Computación II - Búsqueda por Truncamiento")
+        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Truncamiento)")
 
         # --- Layout principal ---
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.setSpacing(20)
 
-        # --- Encabezado ---
+        # --- Encabezado con gradiente ---
         header = QFrame()
         header.setStyleSheet("""
             background: qlineargradient(
@@ -33,7 +35,7 @@ class TruncamientoInterna(QMainWindow):
         """)
         header_layout = QVBoxLayout(header)
 
-        titulo = QLabel("Ciencias de la Computación II - Búsqueda por Truncamiento")
+        titulo = QLabel("Ciencias de la Computación II - Función Hash (Truncamiento)")
         titulo.setAlignment(Qt.AlignCenter)
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
@@ -63,13 +65,12 @@ class TruncamientoInterna(QMainWindow):
             menu_layout.addWidget(btn)
 
         header_layout.addLayout(menu_layout)
-
         btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
 
         layout.addWidget(header)
 
-        # --- Controles ---
+        # --- Controles principales ---
         self.rango = QComboBox()
         self.rango.addItems([f"10^{i}" for i in range(1, 6)])
         self.digitos = QSpinBox()
@@ -80,8 +81,15 @@ class TruncamientoInterna(QMainWindow):
         self.btn_agregar = QPushButton("Adicionar claves")
         self.btn_cargar = QPushButton("Cargar estructura")
         self.btn_eliminar = QPushButton("Eliminar estructura")
+        self.btn_buscar = QPushButton("Buscar clave")
+        self.btn_eliminar_clave = QPushButton("Eliminar clave")
+        self.btn_deshacer = QPushButton("Deshacer último movimiento")
+        self.btn_guardar = QPushButton("Guardar estructura")
 
-        for btn in (self.btn_crear, self.btn_agregar, self.btn_cargar, self.btn_eliminar):
+        for btn in (
+            self.btn_crear, self.btn_agregar, self.btn_cargar, self.btn_eliminar,
+            self.btn_buscar, self.btn_eliminar_clave, self.btn_deshacer, self.btn_guardar
+        ):
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
@@ -106,8 +114,12 @@ class TruncamientoInterna(QMainWindow):
         grid_botones.addWidget(self.btn_agregar, 0, 1)
         grid_botones.addWidget(self.btn_cargar, 1, 0)
         grid_botones.addWidget(self.btn_eliminar, 1, 1)
-
+        grid_botones.addWidget(self.btn_buscar, 2, 0)
+        grid_botones.addWidget(self.btn_eliminar_clave, 2, 1)
+        grid_botones.addWidget(self.btn_deshacer, 3, 0)
+        grid_botones.addWidget(self.btn_guardar, 3, 1)
         controles.addLayout(grid_botones)
+
         layout.addLayout(controles)
 
         # --- Contenedor con scroll ---
@@ -126,57 +138,48 @@ class TruncamientoInterna(QMainWindow):
         self.btn_agregar.clicked.connect(self.adicionar_claves)
         self.btn_cargar.clicked.connect(self.cargar_estructura)
         self.btn_eliminar.clicked.connect(self.eliminar_estructura)
+        self.btn_buscar.clicked.connect(self.buscar_clave)
+        self.btn_eliminar_clave.clicked.connect(self.eliminar_clave)
+        self.btn_deshacer.clicked.connect(self.deshacer)
+        self.btn_guardar.clicked.connect(self.guardar_estructura)
 
-        # Estado
-        self.labels = []
-        self.capacidad = 0
+    # ===================== MÉTODOS FUNCIONALES =====================
 
-    # --- Métodos básicos ---
     def crear_estructura(self):
-        # limpiar anterior
         for i in reversed(range(self.grid.count())):
-            widget = self.grid.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
+            w = self.grid.itemAt(i).widget()
+            if w:
+                w.setParent(None)
         self.labels.clear()
 
         n = int(self.rango.currentText().split("^")[1])
         self.capacidad = 10 ** n
+        dig = self.digitos.value()
+        self.controller.crear_estructura(self.capacidad, dig, [])
 
-        # Crear estructura vacía (sin posiciones aún)
-        self.controller.crear_estructura(self.capacidad, self.digitos.value(), [])
+        try:
+            digitos_req = self.controller._digitos_necesarios()
+        except AttributeError:
+            QMessageBox.warning(self, "Error", "El controlador no tiene el método '_digitos_necesarios'.")
+            return
 
-        for i in range(self.capacidad if self.capacidad <= 100 else 100):
-            self._agregar_cuadro(i)
-
-        # --- pedir posiciones con reintento ---
-        digitos_req = self.controller._digitos_necesarios()
-        while True:
-            dlg = DialogoPosiciones(self.digitos.value(), digitos_req, self)
-            if dlg.exec():
-                posiciones = dlg.get_posiciones(digitos_req)
-                if posiciones:
-                    self.controller.posiciones = posiciones
-                    self.controller.guardar()
-                    QMessageBox.information(
-                        self, "OK",
-                        f"Posiciones seleccionadas: {posiciones}"
-                    )
-                    break
-                else:
-                    QMessageBox.warning(
-                        self, "Error",
-                        f"Debes seleccionar exactamente {digitos_req} posición(es)."
-                    )
+        dlg = DialogoPosiciones(dig, digitos_req, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            posiciones = dlg.get_posiciones(digitos_req)
+            if posiciones and len(posiciones) == digitos_req:
+                self.controller.posiciones = posiciones
+                QMessageBox.information(self, "OK", f"Posiciones seleccionadas: {posiciones}")
             else:
-                QMessageBox.warning(
-                    self, "Cancelado",
-                    "Debes seleccionar posiciones antes de continuar."
-                )
+                QMessageBox.warning(self, "Error", "Número incorrecto de posiciones.")
+        else:
+            QMessageBox.warning(self, "Cancelado", "Debes seleccionar posiciones.")
 
-    def _agregar_cuadro(self, i):
-        fila = (i // 10) * 2
-        col = i % 10
+        for i in range(min(self.capacidad, 100)):
+            self._agregar_cuadro(i + 1, i + 1)
+
+    def _agregar_cuadro(self, idx_visual, idx_real):
+        fila = ((idx_visual - 1) // 10) * 2
+        col = (idx_visual - 1) % 10
 
         cuadro = QLabel("")
         cuadro.setAlignment(Qt.AlignCenter)
@@ -191,73 +194,99 @@ class TruncamientoInterna(QMainWindow):
         """)
         self.grid.addWidget(cuadro, fila, col, alignment=Qt.AlignCenter)
 
-        numero = QLabel(str(i + 1))
+        numero = QLabel(str(idx_real))
         numero.setAlignment(Qt.AlignCenter)
         numero.setStyleSheet("font-size: 14px; color: gray; margin-top: 5px;")
         self.grid.addWidget(numero, fila + 1, col, alignment=Qt.AlignCenter)
-
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
-        if not self.labels:
+        if self.capacidad == 0:
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
-        # Si aún no se han definido posiciones, pedirlas ahora
         if not self.controller.posiciones:
-            texto_pos = self.posiciones_input.text().strip()
-            if texto_pos:
-                try:
-                    posiciones = [int(p) for p in texto_pos.split(",") if p.strip().isdigit()]
-                except ValueError:
-                    QMessageBox.warning(self, "Error", "Posiciones inválidas. Usa números separados por coma.")
-                    return
-            else:
-                QMessageBox.warning(self, "Error", "Debes indicar al menos una posición antes de insertar.")
-                return
-            self.controller.posiciones = posiciones
-            self.controller.guardar()
+            QMessageBox.warning(self, "Error", "Selecciona posiciones primero.")
+            return
 
-        dlg = DialogoClave(self.digitos.value(), self)
-        if dlg.exec():
-            clave = dlg.get_clave()
-            estado = self.controller.agregar_clave(clave)  # 👈 aquí corriges nombre, usabas "adicionar_clave"
+        dialogo = DialogoClave(
+            longitud=self.digitos.value(),
+            titulo=f"Clave de {self.digitos.value()} dígitos",
+            modo="insertar",
+            parent=self
+        )
+        if dialogo.exec() != QDialog.Accepted:
+            return
 
-            if estado == "OK":
-                estructura = self.controller.estructura
-                for i, lbl in enumerate(self.labels, start=1):
-                    valor = estructura.get(i, "")
-                    if valor != "":
-                        lbl.setText(valor)
-                        lbl.setStyleSheet("""
-                            QLabel {
-                                background-color: #C4B5FD;
-                                border: 2px solid #6D28D9;
-                                border-radius: 12px;
-                                font-size: 18px;
-                                font-weight: bold;
-                            }
-                        """)
-                    else:
-                        lbl.setText("")
-                        lbl.setStyleSheet("""
-                            QLabel {
-                                background-color: #EDE9FE;
-                                border: 2px solid #A78BFA;
-                                border-radius: 12px;
-                                font-size: 18px;
-                            }
-                        """)
+        clave = dialogo.get_clave()
+        resultado = self.controller.agregar_clave(clave)
 
-            elif estado == "REPETIDA":
-                QMessageBox.warning(self, "Error", f"La clave {clave} ya fue insertada.")
-            elif estado == "LLENO":
-                QMessageBox.warning(self, "Error", "La estructura está llena.")
-            elif estado == "LONGITUD":
-                QMessageBox.warning(self, "Error", "Longitud incorrecta.")
+        if resultado == "OK":
+            QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
+            self.actualizar_tabla()
+        else:
+            QMessageBox.warning(self, "Error", f"Resultado: {resultado}")
 
-    def cargar_estructura(self):
-        QMessageBox.information(self, "Pendiente", "Lógica de cargar estructura aún no implementada.")
+    def eliminar_clave(self):
+        clave, ok = QInputDialog.getText(self, "Eliminar Clave", "Ingrese la clave a eliminar:")
+        if not ok or not clave.strip():
+            return
+
+        resultado = self.controller.eliminar_clave(clave.strip())
+        QMessageBox.information(self, "Resultado", resultado)
+        self.actualizar_tabla()
+
+    def buscar_clave(self):
+        clave, ok = QInputDialog.getText(self, "Buscar Clave", "Ingrese la clave:")
+        if not ok or not clave.strip():
+            return
+
+        datos = self.controller.estructura
+        encontrado = None
+        for pos, valor in datos.items():
+            if str(valor) == clave:
+                encontrado = pos
+                break
+
+        if encontrado:
+            QMessageBox.information(self, "Resultado", f"Clave {clave} encontrada en posición {encontrado}")
+        else:
+            QMessageBox.warning(self, "Resultado", f"Clave {clave} no encontrada")
+
+    def deshacer(self):
+        res = self.controller.deshacer()
+        QMessageBox.information(self, "Deshacer", res)
+        self.actualizar_tabla()
 
     def eliminar_estructura(self):
-        QMessageBox.information(self, "Pendiente", "Lógica de eliminar estructura aún no implementada.")
+        resp = QMessageBox.question(
+            self, "Eliminar estructura", "¿Desea eliminar la estructura actual?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if resp == QMessageBox.Yes:
+            self.controller.estructura = {}
+            self.controller.posiciones = []
+            self.actualizar_tabla()
+            QMessageBox.information(self, "Éxito", "Estructura eliminada correctamente.")
+
+    def guardar_estructura(self):
+        ruta, _ = QFileDialog.getSaveFileName(self, "Guardar estructura", "truncamiento_interna.json", "Archivos JSON (*.json)")
+        if ruta:
+            self.controller.ruta_archivo = ruta
+            self.controller.guardar()
+            QMessageBox.information(self, "Éxito", f"Estructura guardada en:\n{ruta}")
+
+    def cargar_estructura(self):
+        ruta, _ = QFileDialog.getOpenFileName(self, "Cargar estructura", "", "Archivos JSON (*.json)")
+        if ruta:
+            self.controller.ruta_archivo = ruta
+            if self.controller.cargar():
+                QMessageBox.information(self, "Éxito", "Estructura cargada correctamente.")
+                self.actualizar_tabla()
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo cargar el archivo.")
+
+    def actualizar_tabla(self):
+        for i, lbl in enumerate(self.labels, start=1):
+            valor = self.controller.estructura.get(i, "")
+            lbl.setText(str(valor) if valor else "")
