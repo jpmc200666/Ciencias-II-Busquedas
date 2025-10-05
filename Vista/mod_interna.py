@@ -181,6 +181,8 @@ class ModInterna(QMainWindow):
             for i in range(self.capacidad):
                 self._agregar_cuadro(i + 1, i + 1)
 
+        self.controller.ultima_estrategia = None
+
     def _agregar_cuadro(self, idx_visual, idx_real):
         fila = ((idx_visual - 1) // 10) * 2
         col = (idx_visual - 1) % 10
@@ -207,12 +209,12 @@ class ModInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
-        """Método corregido para adicionar claves con manejo de colisiones."""
+        """Adiciona una clave y maneja correctamente las colisiones y la vista."""
         if self.capacidad == 0 or self.controller is None:
             QMessageBox.warning(self, "Error", "Primero cree la estructura.")
             return
 
-        # Obtener la clave del usuario
+        # Obtener clave del usuario
         dialogo = DialogoClave(
             longitud=self.digitos.value(),
             titulo=f"Clave de {self.digitos.value()} dígitos",
@@ -224,34 +226,48 @@ class ModInterna(QMainWindow):
 
         clave = dialogo.get_clave()
 
-        # Intentar insertar sin estrategia (para detectar colisión)
+        # Intentar insertar (sin estrategia inicial)
         resultado = self.controller.adicionar_clave(clave)
 
+        # Si hubo colisión
         if resultado == "COLISION":
-            # HAY COLISIÓN - Mostrar diálogo de estrategias
             dlg_col = DialogoColisiones(self)
             if dlg_col.exec() == QDialog.Accepted:
                 estrategia = dlg_col.get_estrategia()
-                # Reintentar con la estrategia seleccionada
+
+                # Registrar estrategia usada en el controlador
+                self.controller.ultima_estrategia = estrategia
+
+                # Reintentar la inserción con la estrategia seleccionada
                 resultado = self.controller.adicionar_clave(clave, estrategia)
             else:
-                # Usuario canceló la selección de estrategia
-                QMessageBox.information(self, "Cancelado", "Inserción cancelada.")
+                QMessageBox.information(self, "Cancelado", "Inserción cancelada por el usuario.")
                 return
 
         # Manejar resultados
         if resultado == "OK":
             QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
-            self.actualizar_tabla()
+
+            # 🔹 Actualizar la vista según la estrategia usada
+            if getattr(self.controller, "ultima_estrategia", "") == "Arreglo anidado":
+                self.actualizar_vista_anidada(modo="vertical")
+            else:
+                # Modo normal (horizontal u otra vista)
+                self.actualizar_tabla()
+
         elif resultado == "LONGITUD":
             QMessageBox.warning(self, "Error",
                                 f"La clave debe tener exactamente {self.digitos.value()} dígitos.")
+
         elif resultado == "REPETIDA":
             QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
-        elif resultado.startswith("ERROR:"):
+
+        elif isinstance(resultado, str) and resultado.startswith("ERROR:"):
             QMessageBox.critical(self, "Error", resultado)
+
         else:
             QMessageBox.warning(self, "Error", f"Resultado inesperado: {resultado}")
+
     def cargar_estructura(self):
         # ⚠️ Advertencia si ya hay datos en memoria
         if self.controller.capacidad > 0 and any(self.controller.estructura.values()):
@@ -350,43 +366,159 @@ class ModInterna(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo guardar la estructura:\n{e}")
 
-    def actualizar_tabla(self):
-        datos = self.controller.obtener_datos_vista()
-        estructura = datos.get("estructura", {})
-
-        # limpiar grid anterior
+    def actualizar_vista_anidada(self, modo="vertical"):
+        """Dibuja el arreglo principal completo y muestra colisiones a la derecha."""
+        # Limpiar grid
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
-                widget.deleteLater()
+                widget.setParent(None)
 
-        # volver a dibujar las celdas con el mismo estilo de _agregar_cuadro
-        for i in range(self.controller.capacidad):
-            fila = (i // 10) * 2
-            col = i % 10
+        estructura = self.controller.estructura or {}
+        anidados = getattr(self.controller, "estructura_anidada", [])
 
-            # cuadro principal
-            celda = QLabel(str(estructura.get(i + 1, "")) or "")
+        # 🔹 Garantizar longitud igual a la capacidad
+        if not isinstance(anidados, list):
+            anidados = []
+        if len(anidados) != self.controller.capacidad:
+            anidados = (anidados + [[]] * self.controller.capacidad)[:self.controller.capacidad]
+
+        # 🔹 Calcular el número máximo de columnas anidadas existentes
+        max_colisiones = max((len(sublista) for sublista in anidados), default=0)
+
+        # --- Títulos ---
+        # --- Título combinado ---
+        titulo = QLabel("Arreglo principal  |  Arreglos anidados (colisiones)")
+        titulo.setAlignment(Qt.AlignCenter)
+        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #4C1D95;")
+        self.grid.addWidget(titulo, 0, 0, 1, max_colisiones + 2, alignment=Qt.AlignCenter)
+
+        # --- Estructura principal + anidados ---
+        for fila in range(1, self.controller.capacidad + 1):
+            val = estructura.get(fila, "")
+            texto = str(val).zfill(self.controller.digitos) if val else ""
+            celda = QLabel(texto)
             celda.setAlignment(Qt.AlignCenter)
-            celda.setFixedSize(60, 60)
+            celda.setFixedSize(70, 70)
             celda.setStyleSheet("""
-                QLabel {
-                    background-color: #EDE9FE;
-                    border: 2px solid #7C3AED;
-                    border-radius: 12px;
-                    font-size: 16px;
-                }
+                background-color: #EDE9FE;
+                border: 2px solid #7C3AED;
+                border-radius: 10px;
+                font-size: 16px;
             """)
-            self.grid.addWidget(celda, fila, col, alignment=Qt.AlignCenter)
+            self.grid.addWidget(celda, fila, 0, alignment=Qt.AlignCenter)
 
-            # índice debajo
-            numero = QLabel(str(i + 1))
-            numero.setAlignment(Qt.AlignCenter)
-            numero.setStyleSheet("font-size: 14px; color: gray; margin-top: 5px;")
-            self.grid.addWidget(numero, fila + 1, col, alignment=Qt.AlignCenter)
+            # índice
+            idx = QLabel(str(fila))
+            idx.setAlignment(Qt.AlignCenter)
+            idx.setStyleSheet("color: gray; font-size: 12px;")
+            self.grid.addWidget(idx, fila + 1, 0, alignment=Qt.AlignTop | Qt.AlignCenter)
 
-        # actualizar lista de labels
-        self.labels = [
-            self.grid.itemAt(j).widget()
-            for j in range(0, self.grid.count(), 2)  # cada 2 porque hay celda + índice
-        ]
+            # --- Colisiones (relleno completo por columnas) ---
+            sublista = anidados[fila - 1] if fila - 1 < len(anidados) else []
+            for j in range(1, max_colisiones + 1):
+                if j <= len(sublista):
+                    # Celda con valor real
+                    texto = str(sublista[j - 1]).zfill(self.controller.digitos)
+                    estilo = """
+                        background-color: #DDD6FE;
+                        border: 2px solid #7C3AED;
+                        border-radius: 10px;
+                        font-size: 16px;
+                    """
+                else:
+                    # Celda vacía (guía)
+                    texto = ""
+                    estilo = """
+                        border: 2px dashed #C4B5FD;
+                        background-color:#F5F3FF;
+                        border-radius:10px;
+                    """
+
+                lbl = QLabel(texto)
+                lbl.setAlignment(Qt.AlignCenter)
+                lbl.setFixedSize(70, 70)
+                lbl.setStyleSheet(estilo)
+                self.grid.addWidget(lbl, fila, j + 1, alignment=Qt.AlignCenter)
+
+    def actualizar_tabla(self):
+        """Actualiza la vista para arreglos anidados (colisiones)."""
+        # limpiar grid principal
+        for i in reversed(range(self.grid.count())):
+            widget = self.grid.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        self.labels = []
+        estructura = self.controller.estructura
+
+        # caso: arreglo anidado (colisiones)
+        if isinstance(estructura, dict) and all(isinstance(v, list) for v in estructura.values()):
+            titulo = QLabel("Arreglo principal     Arreglo anidado (colisiones)")
+            titulo.setStyleSheet("font-weight: bold; font-size: 16px; color: #4B0082;")
+            self.grid.addWidget(titulo, 0, 0, 1, 10, alignment=Qt.AlignCenter)
+
+            # columnas separadas para el principal y cada subarreglo
+            col_principal = 0
+            col_sub = 1
+            tam_sub = 5  # cantidad de cuadros por subarreglo
+
+            for idx in range(1, self.capacidad + 1):
+                # cuadro del arreglo principal
+                cuadro = QLabel()
+                cuadro.setAlignment(Qt.AlignCenter)
+                cuadro.setFixedSize(70, 70)
+                cuadro.setStyleSheet("background-color: #f3e8ff; border: 2px solid #7c3aed; border-radius: 10px;")
+                val = ""
+                if isinstance(estructura.get(idx, None), list) and estructura[idx]:
+                    val = estructura[idx][0] if estructura[idx] else ""
+                elif isinstance(estructura.get(idx, None), str):
+                    val = estructura[idx]
+                cuadro.setText(val)
+                self.grid.addWidget(cuadro, idx, col_principal, alignment=Qt.AlignCenter)
+
+                # etiqueta con número de posición debajo
+                etiqueta = QLabel(str(idx))
+                etiqueta.setStyleSheet("color: #7c3aed; font-size: 12px;")
+                self.grid.addWidget(etiqueta, idx + 1, col_principal, alignment=Qt.AlignCenter)
+
+                # ahora el subarreglo completo
+                sublista = estructura.get(idx, [])
+                for j in range(tam_sub):
+                    valor = sublista[j] if j < len(sublista) else ""
+                    sub_label = QLabel(valor)
+                    sub_label.setAlignment(Qt.AlignCenter)
+                    sub_label.setFixedSize(70, 70)
+
+                    if valor:
+                        sub_label.setStyleSheet(
+                            "background-color: #ddd6fe; border: 2px solid #7c3aed; border-radius: 10px;")
+                    else:
+                        sub_label.setStyleSheet(
+                            "border: 2px dashed #c084fc; background-color: #faf5ff; border-radius: 10px;")
+
+                    # dibujar el subarreglo en la misma fila del principal, pero más a la derecha
+                    self.grid.addWidget(sub_label, j, col_sub, alignment=Qt.AlignCenter)
+
+            return
+
+        # ---- CASO NORMAL (sin colisiones anidadas) ----
+        if self.capacidad > 1000:
+            mostrar = 50
+            for i in range(mostrar):
+                self._agregar_cuadro(i + 1, i + 1)
+            puntos = QLabel("...")
+            puntos.setStyleSheet("font-size: 18px; color: gray;")
+            self.grid.addWidget(puntos, (mostrar // 10) * 2, mostrar % 10, 2, 1, alignment=Qt.AlignCenter)
+            for i in range(mostrar):
+                idx_real = self.capacidad - mostrar + i + 1
+                self._agregar_cuadro(mostrar + i + 1, idx_real)
+        else:
+            for i in range(self.capacidad):
+                self._agregar_cuadro(i + 1, i + 1)
+
+        # rellenar valores normales
+        for idx, cuadro in enumerate(self.labels):
+            pos = idx + 1
+            val = estructura.get(pos, "")
+            cuadro.setText(val if val else "")

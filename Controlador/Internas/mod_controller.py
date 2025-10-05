@@ -11,6 +11,8 @@ class ModController:
         self.digitos = 0
         self.historial = []
         self.colisiones_controller = None
+        self.estructura_anidada = []  # estructura independiente para arreglo anidado
+        self.ultima_estrategia = None
 
         os.makedirs(os.path.dirname(self.ruta_archivo), exist_ok=True)
 
@@ -22,64 +24,75 @@ class ModController:
         """Crea una nueva estructura hash."""
         self.capacidad = capacidad
         self.digitos = digitos
+        # estructura indexada desde 1 .. capacidad (más intuitivo para la vista)
         self.estructura = {i: "" for i in range(1, capacidad + 1)}
         self.historial.clear()
+        # crear controlador de colisiones (usa índices 0..capacidad-1 internamente)
         self.colisiones_controller = ColisionesController(capacidad, metodo_hash)
+
+        # normalizar estructura_anidada a lista de listas (no None)
+        raw_anidada = getattr(self.colisiones_controller, "estructura_anidada", None)
+        if raw_anidada is None:
+            self.estructura_anidada = [[] for _ in range(capacidad)]
+        else:
+            # convertir posibles None a listas vacías
+            self.estructura_anidada = [lst if lst else [] for lst in raw_anidada]
+
         self.guardar()
 
     def adicionar_clave(self, clave: str, estrategia=None) -> str:
-        """
-        Intenta adicionar una clave a la estructura.
-        Retorna:
-        - "OK": si se insertó correctamente
-        - "LONGITUD": si la clave no tiene la longitud correcta
-        - "REPETIDA": si la clave ya existe
-        - "COLISION": si hay colisión y no se especificó estrategia
-        - "ERROR: ...": si ocurrió un error
-        """
-        # Validaciones
         if len(clave) != self.digitos:
             return "LONGITUD"
 
-        # Verificar si la clave ya existe
         if clave in [v for v in self.estructura.values() if v]:
             return "REPETIDA"
 
         try:
-            # ⚠️ Usa la conversión solo para calcular la posición hash
             clave_int = int(clave)
-
-            # Guardar estado antes de insertar
             self._guardar_estado()
 
-            # Calcular posición base
+            # calcular posición 0-based con el colisiones_controller
             pos_base = self.colisiones_controller.calcular_posicion(clave_int)
 
-            # Verificar si hay colisión
+            # si la posición primaria está vacía -> insertar en principal
             if self.colisiones_controller.estructura[pos_base] is None:
-                # No hay colisión, insertar directamente
-                self.colisiones_controller.estructura[pos_base] = clave_int  # versión numérica interna
-                self.estructura[pos_base + 1] = clave  # 👈 guarda el texto original con ceros
+                self.colisiones_controller.estructura[pos_base] = clave_int
+                self.estructura[pos_base + 1] = str(clave).zfill(self.digitos)
                 self.guardar()
                 return "OK"
-            else:
-                # HAY COLISIÓN
-                if estrategia is None:
-                    self.historial.pop()
-                    return "COLISION"
 
-                # Resolver colisión con estrategia
+            # hay colisión
+            if estrategia is None:
+                self.historial.pop()
+                return "COLISION"
+
+            # registrar estrategia
+            self.ultima_estrategia = estrategia
+
+            # --- Arreglo anidado: usar el controlador de colisiones para insertar ---
+            if estrategia == "Arreglo anidado":
+                # delegar en ColisionesController (que debe crear/añadir en estructura_anidada[pos_base])
                 pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
-                self._sincronizar_estructura()
 
-                # 🔧 Corrige visualmente para mostrar siempre los ceros originales
+                # sincronizar estructura_anidada desde el controlador (convertir None->[])
+                raw = getattr(self.colisiones_controller, "estructura_anidada", [])
+                self.estructura_anidada = [lst if lst else [] for lst in raw]
+
+                # (no removemos ni cambiamos la estructura principal; sólo se añade en anidados)
+                # formatear visualmente la estructura principal (ceros a la izquierda)
                 for i in range(1, self.capacidad + 1):
-                    valor = self.estructura[i]
-                    if str(valor).isdigit():
-                        self.estructura[i] = str(valor).zfill(self.digitos)
+                    val = self.estructura.get(i, "")
+                    if val and str(val).isdigit():
+                        self.estructura[i] = str(val).zfill(self.digitos)
 
                 self.guardar()
                 return "OK"
+
+            # --- Otras estrategias (lineal/cuadrática/doble): delegar y sincronizar ---
+            pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
+            self._sincronizar_estructura()
+            self.guardar()
+            return "OK"
 
         except ValueError:
             return "ERROR: La clave debe ser numérica"
@@ -91,11 +104,10 @@ class ModController:
         for i in range(self.capacidad):
             valor = self.colisiones_controller.estructura[i]
             if valor is not None:
-                # Manejar listas (encadenamiento)
                 if isinstance(valor, list):
                     self.estructura[i + 1] = ", ".join(map(str, valor))
                 else:
-                    self.estructura[i + 1] = str(valor)
+                    self.estructura[i + 1] = str(valor).zfill(self.digitos)
             else:
                 self.estructura[i + 1] = ""
 
@@ -105,39 +117,37 @@ class ModController:
             return "VACIO"
         self.estructura = self.historial.pop()
 
-        # Reconstruir colisiones_controller desde estructura
         if self.colisiones_controller:
             self.colisiones_controller.estructura = [None] * self.capacidad
             for pos, valor in self.estructura.items():
                 if valor and valor != "":
-                    idx = pos - 1  # ajustar índice
+                    idx = pos - 1
                     try:
                         self.colisiones_controller.estructura[idx] = int(valor)
                     except ValueError:
-                        # puede ser lista encadenada con formato "1234, 5678"
                         self.colisiones_controller.estructura[idx] = valor
-
         self.guardar()
         return "OK"
 
     def eliminar_clave(self, clave: str) -> str:
         """Elimina una clave si existe en la estructura."""
         clave = str(clave)
-
-        # Buscar la clave
         encontrada = False
+
         for k, v in list(self.estructura.items()):
             if str(v) == clave:
                 encontrada = True
                 self._guardar_estado()
-
-                # Eliminar de estructura visible
                 self.estructura[k] = ""
 
-                # Eliminar de colisiones_controller
                 if self.colisiones_controller:
                     idx = k - 1
                     self.colisiones_controller.estructura[idx] = None
+
+                # También eliminar de estructura anidada si existe
+                self.estructura_anidada = [
+                    sub for sub in self.estructura_anidada if clave not in sub
+                ]
 
                 self.guardar()
                 break
@@ -149,7 +159,8 @@ class ModController:
         datos = {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
-            "estructura": self.estructura
+            "estructura": self.estructura,
+            "estructura_anidada": self.estructura_anidada
         }
         ManejadorArchivos.guardar_json(self.ruta_archivo, datos)
 
@@ -160,9 +171,9 @@ class ModController:
             self.capacidad = datos.get("capacidad", 0)
             self.digitos = datos.get("digitos", 0)
             self.estructura = {int(k): v for k, v in datos.get("estructura", {}).items()}
-
-            # Reconstruir colisiones_controller
+            self.estructura_anidada = datos.get("estructura_anidada", [])
             self.colisiones_controller = ColisionesController(self.capacidad, "mod")
+
             for pos, valor in self.estructura.items():
                 if valor and valor != "":
                     idx = pos - 1
@@ -170,7 +181,6 @@ class ModController:
                         self.colisiones_controller.estructura[idx] = int(valor)
                     except ValueError:
                         self.colisiones_controller.estructura[idx] = valor
-
             return True
         return False
 
@@ -179,5 +189,6 @@ class ModController:
         return {
             "capacidad": self.capacidad,
             "digitos": self.digitos,
-            "estructura": self.estructura
+            "estructura": self.estructura,
+            "estructura_anidada": self.estructura_anidada
         }
