@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
     QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QInputDialog, QHBoxLayout, QDialog, QMessageBox, QFileDialog, QTableWidgetItem
+    QInputDialog, QHBoxLayout, QDialog, QFileDialog
 )
 from PySide6.QtCore import Qt
 from .dialogo_clave import DialogoClave
@@ -19,25 +19,29 @@ class ModInterna(QMainWindow):
         # --- Layout principal ---
         central = QWidget()
         layout = QVBoxLayout(central)
-        layout.setSpacing(20)
+        layout.setSpacing(15)
 
-        # --- Encabezado ---
+        # --- Encabezado idéntico al de búsqueda lineal ---
         header = QFrame()
         header.setStyleSheet("""
-            background: qlineargradient(
-                spread:pad, x1:0, y1:0, x2:1, y2:0,
-                stop:0 #D8B4FE, stop:1 #A78BFA
-            );
+            background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0,
+            stop:0 #D8B4FE, stop:1 #A78BFA);
             border-radius: 12px;
         """)
         header_layout = QVBoxLayout(header)
+        header_layout.setSpacing(5)
 
         titulo = QLabel("Ciencias de la Computación II - Función Hash (Módulo)")
         titulo.setAlignment(Qt.AlignCenter)
-        titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
+        titulo.setStyleSheet("""
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            margin-top: 10px;
+        """)
         header_layout.addWidget(titulo)
 
-        # --- Menú debajo del título ---
+        # Menú igual al de búsqueda lineal
         menu_layout = QHBoxLayout()
         menu_layout.setSpacing(40)
         menu_layout.setAlignment(Qt.AlignCenter)
@@ -62,63 +66,79 @@ class ModInterna(QMainWindow):
             menu_layout.addWidget(btn)
 
         header_layout.addLayout(menu_layout)
+        layout.addWidget(header)
+
+        # Conexiones del menú
         btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
 
-        layout.addWidget(header)
+        # --- Controles superiores alineados horizontalmente ---
+        controles_superiores = QHBoxLayout()
+        controles_superiores.setSpacing(15)
+        controles_superiores.setAlignment(Qt.AlignCenter)
 
-        # --- Controles superiores ---
+        lbl_rango = QLabel("Rango (10^n):")
+        lbl_rango.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.rango = QComboBox()
-        self.rango.addItems([f"10^{i}" for i in range(1, 6)])  # igual que en binaria_interna
+        self.rango.addItems([f"10^{i}" for i in range(1, 6)])
+        self.rango.setFixedWidth(100)
+
+        lbl_digitos = QLabel("Número de dígitos:")
+        lbl_digitos.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
+        self.digitos.setFixedWidth(60)
+
+        controles_superiores.addWidget(lbl_rango)
+        controles_superiores.addWidget(self.rango)
+        controles_superiores.addWidget(lbl_digitos)
+        controles_superiores.addWidget(self.digitos)
+
+        layout.addLayout(controles_superiores)
+
+        # --- Botones principales (misma distribución visual que búsqueda lineal) ---
+        botones_layout = QGridLayout()
+        botones_layout.setSpacing(12)
+        botones_layout.setAlignment(Qt.AlignCenter)
 
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_agregar = QPushButton("Adicionar claves")
-        self.btn_cargar = QPushButton("Cargar estructura")
-        self.btn_eliminar = QPushButton("Eliminar estructura")
         self.btn_buscar = QPushButton("Buscar clave")
         self.btn_eliminar_clave = QPushButton("Eliminar clave")
         self.btn_deshacer = QPushButton("Deshacer último movimiento")
         self.btn_guardar = QPushButton("Guardar estructura")
+        self.btn_eliminar = QPushButton("Eliminar estructura")
+        self.btn_cargar = QPushButton("Cargar estructura")
 
-        for btn in ( self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_cargar,self.btn_eliminar,
-                     self.btn_eliminar_clave, self.btn_deshacer, self.btn_guardar):
+        botones = [
+            self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_eliminar_clave,
+            self.btn_deshacer, self.btn_guardar, self.btn_eliminar, self.btn_cargar
+        ]
 
-                     btn.setStyleSheet("""
+        for i, btn in enumerate(botones):
+            btn.setFixedHeight(45)
+            btn.setFixedWidth(240)
+
+            btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
                     color: white;
-                    padding: 10px 20px;
-                    font-size: 16px;
+                    font-size: 15px;
                     border-radius: 10px;
+                    padding: 8px 20px;
                 }
                 QPushButton:hover {
                     background-color: #6D28D9;
                 }
             """)
+            fila = i // 4
+            col = i % 4
+            botones_layout.addWidget(btn, fila, col, alignment=Qt.AlignCenter)
 
-        controles = QVBoxLayout()
-        controles.addWidget(QLabel("Rango (10^n):"))
-        controles.addWidget(self.rango)
-        controles.addWidget(QLabel("Número de dígitos de la clave:"))
-        controles.addWidget(self.digitos)
+        layout.addLayout(botones_layout)
 
-        grid_botones = QGridLayout()
-        grid_botones.addWidget(self.btn_crear, 0, 0)
-        grid_botones.addWidget(self.btn_agregar, 0, 1)
-        grid_botones.addWidget(self.btn_cargar, 1, 0)
-        grid_botones.addWidget(self.btn_eliminar, 1, 1)
-        grid_botones.addWidget(self.btn_buscar, 2, 0)
-        grid_botones.addWidget(self.btn_eliminar_clave, 2, 1)
-        grid_botones.addWidget(self.btn_deshacer, 3, 0)
-        grid_botones.addWidget(self.btn_guardar, 3, 1)
-
-        controles.addLayout(grid_botones)
-        layout.addLayout(controles)
-
-        # --- Contenedor con scroll ---
+        # --- Contenedor con scroll para la estructura ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.contenedor = QWidget()
@@ -138,6 +158,7 @@ class ModInterna(QMainWindow):
         self.btn_eliminar_clave.clicked.connect(self.eliminar_clave)
         self.btn_deshacer.clicked.connect(self.deshacer)
         self.btn_guardar.clicked.connect(self.guardar_estructura)
+
         # Estado
         self.labels = []
         self.capacidad = 0
@@ -158,12 +179,20 @@ class ModInterna(QMainWindow):
         # Crear estructura en el controlador
         self.controller.crear_estructura(self.capacidad, self.digitos.value())
 
+        # 🔒 BLOQUEAR controles de rango y dígitos después de crear la estructura
+        self.rango.setEnabled(False)
+        self.digitos.setEnabled(False)
+
         if self.capacidad > 1000:
-            QMessageBox.information(
-                self, "Vista representativa",
-                f"La capacidad real es {self.capacidad}, "
-                "pero solo se muestra parcialmente."
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Vista representativa",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"La capacidad real es {self.capacidad}, pero solo se muestra parcialmente."
             )
+            dialogo.exec()
+
             mostrar = 50
             for i in range(mostrar):
                 self._agregar_cuadro(i + 1, i + 1)
@@ -209,9 +238,34 @@ class ModInterna(QMainWindow):
         self.labels.append(cuadro)
 
     def adicionar_claves(self):
+        # Obtener cantidad total actual de claves (principales + anidadas)
+        total_actual = len([v for v in self.controller.estructura.values() if v])
+        anidados = getattr(self.controller, "estructura_anidada", [])
+        if isinstance(anidados, list):
+            total_actual += sum(len(sublista) for sublista in anidados if sublista)
+
+        # Si ya se alcanzó el límite (capacidad total)
+        if total_actual >= self.controller.capacidad:
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Capacidad alcanzada",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"No se pueden agregar más claves.\nLa estructura ya contiene {total_actual} claves de un máximo de {self.controller.capacidad}."
+            )
+            dialogo.exec()
+            return
+
         """Adiciona una clave y maneja correctamente las colisiones y la vista."""
         if self.capacidad == 0 or self.controller is None:
-            QMessageBox.warning(self, "Error", "Primero cree la estructura.")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje="Primero cree la estructura."
+            )
+            dialogo.exec()
             return
 
         # Obtener clave del usuario
@@ -231,54 +285,100 @@ class ModInterna(QMainWindow):
 
         # Si hubo colisión
         if resultado == "COLISION":
-            dlg_col = DialogoColisiones(self)
-            if dlg_col.exec() == QDialog.Accepted:
-                estrategia = dlg_col.get_estrategia()
-
-                # Registrar estrategia usada en el controlador
-                self.controller.ultima_estrategia = estrategia
-
-                # Reintentar la inserción con la estrategia seleccionada
+            # Si ya hay una estrategia global definida, usarla directamente
+            if getattr(self.controller, "ultima_estrategia", None):
+                estrategia = self.controller.ultima_estrategia
                 resultado = self.controller.adicionar_clave(clave, estrategia)
             else:
-                QMessageBox.information(self, "Cancelado", "Inserción cancelada por el usuario.")
-                return
+                # Si aún no hay estrategia, mostrar el diálogo por primera vez
+                dlg_col = DialogoColisiones(self)
+                if dlg_col.exec() == QDialog.Accepted:
+                    estrategia = dlg_col.get_estrategia()
+                    self.controller.ultima_estrategia = estrategia  # Guardar globalmente
+                    resultado = self.controller.adicionar_clave(clave, estrategia)
+                else:
+                    dialogo = DialogoClave(
+                        longitud=0,
+                        titulo="Cancelado",
+                        modo="mensaje",
+                        parent=self,
+                        mensaje="Inserción cancelada por el usuario."
+                    )
+                    dialogo.exec()
+                    return
 
         # Manejar resultados
         if resultado == "OK":
-            QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Éxito",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Clave {clave} insertada correctamente."
+            )
+            dialogo.exec()
 
-            # 🔹 Actualizar la vista según la estrategia usada
-            if getattr(self.controller, "ultima_estrategia", "") == "Arreglo anidado":
-                self.actualizar_vista_anidada(modo="vertical")
+            # --- Actualizar vista según estrategia ---
+            estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+
+            if estrategia_actual == "Arreglo anidado":
+                self.actualizar_vista_anidada()
+            elif estrategia_actual == "Lista encadenada":
+                self.actualizar_vista_encadenada()
             else:
-                # Modo normal (horizontal u otra vista)
                 self.actualizar_tabla()
 
         elif resultado == "LONGITUD":
-            QMessageBox.warning(self, "Error",
-                                f"La clave debe tener exactamente {self.digitos.value()} dígitos.")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"La clave debe tener exactamente {self.digitos.value()} dígitos."
+            )
+            dialogo.exec()
 
         elif resultado == "REPETIDA":
-            QMessageBox.warning(self, "Error", "La clave ya existe en la estructura.")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje="La clave ya existe en la estructura."
+            )
+            dialogo.exec()
 
         elif isinstance(resultado, str) and resultado.startswith("ERROR:"):
-            QMessageBox.critical(self, "Error", resultado)
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=resultado
+            )
+            dialogo.exec()
 
         else:
-            QMessageBox.warning(self, "Error", f"Resultado inesperado: {resultado}")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Resultado inesperado: {resultado}"
+            )
+            dialogo.exec()
 
     def cargar_estructura(self):
         # ⚠️ Advertencia si ya hay datos en memoria
         if self.controller.capacidad > 0 and any(self.controller.estructura.values()):
-            resp = QMessageBox.warning(
-                self,
-                "Advertencia",
-                "La estructura actual será sobreescrita. ¿Desea continuar?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Advertencia",
+                modo="confirmar",
+                parent=self,
+                mensaje="La estructura actual será sobreescrita. ¿Desea continuar?"
             )
-            if resp == QMessageBox.No:
+            if dialogo.exec() != QDialog.Accepted:
                 return
 
         # Seleccionar archivo
@@ -286,66 +386,406 @@ class ModInterna(QMainWindow):
         if ruta:
             self.controller.ruta_archivo = ruta
             if self.controller.cargar():
-                QMessageBox.information(self, "Éxito", "Estructura cargada correctamente.")
-                self.actualizar_tabla()
+                dialogo = DialogoClave(
+                    longitud=0,
+                    titulo="Éxito",
+                    modo="mensaje",
+                    parent=self,
+                    mensaje="Estructura cargada correctamente."
+                )
+                dialogo.exec()
+
+                # 🔹 Mostrar según la última estrategia usada
+                estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+
+                if estrategia_actual == "Arreglo anidado":
+                    self.actualizar_vista_anidada()
+                elif estrategia_actual == "Lista encadenada":
+                    self.actualizar_vista_encadenada()
+                else:
+                    self.actualizar_tabla()
+
             else:
-                QMessageBox.warning(self, "Error", "No se pudo cargar la estructura.")
+                dialogo = DialogoClave(
+                    longitud=0,
+                    titulo="Error",
+                    modo="mensaje",
+                    parent=self,
+                    mensaje="No se pudo cargar la estructura."
+                )
+                dialogo.exec()
 
     def eliminar_estructura(self):
-        resp = QMessageBox.question(
-            self,
-            "Eliminar estructura",
-            "¿Está seguro de que desea eliminar la estructura actual?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+        dialogo = DialogoClave(
+            longitud=0,
+            titulo="Eliminar estructura",
+            modo="confirmar",
+            parent=self,
+            mensaje="¿Está seguro de que desea eliminar la estructura actual?"
         )
-        if resp == QMessageBox.Yes:
-            self.controller.estructura = {}
-            self.controller.capacidad = 0
-            self.controller.digitos = 0
-            self.controller.historial.clear()
-            self.actualizar_tabla()
-            QMessageBox.information(self, "Éxito", "Estructura eliminada correctamente.")
-
-    def buscar_clave(self):
-        clave, ok = QInputDialog.getText(self, "Buscar Clave", "Ingrese la clave a buscar:")
-        if ok and clave:
-            datos = self.controller.obtener_datos_vista()
-            encontrado = None
-            for pos, valor in datos["estructura"].items():
-                if str(valor) == clave:
-                    encontrado = pos
-                    break
-
-            if encontrado:
-                QMessageBox.information(self, "Resultado", f"Clave {clave} encontrada en posición {encontrado}")
-            else:
-                QMessageBox.warning(self, "Resultado", f"Clave {clave} no encontrada")
-
-    def eliminar_clave(self):
-        clave, ok = QInputDialog.getText(self, "Eliminar clave", "Ingrese la clave a eliminar:")
-        if not ok or not clave.strip():
+        if dialogo.exec() != QDialog.Accepted:
             return
 
-        resultado = self.controller.eliminar_clave(clave.strip())
+        # --- 🔹 Limpieza visual total (todos los widgets y layouts anidados) ---
+        def limpiar_layout(layout):
+            """Elimina recursivamente todos los widgets y sublayouts."""
+            if layout is not None:
+                while layout.count():
+                    item = layout.takeAt(0)
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.setParent(None)
+                    elif item.layout():
+                        limpiar_layout(item.layout())
 
-        if resultado == "OK":
-            QMessageBox.information(self, "Éxito", f"La clave {clave} fue eliminada correctamente.")
-            self.actualizar_tabla()  # 👈 REFRESCAR TABLA
-        elif resultado == "NO_EXISTE":
-            QMessageBox.warning(self, "Error", f"La clave {clave} no existe en la estructura.")
+        limpiar_layout(self.grid)  # limpia todo el grid visual
+
+        # --- 🔹 Reiniciar estructuras del controlador ---
+        self.controller.estructura = {}
+        self.controller.capacidad = 0
+        self.controller.digitos = 0
+        self.controller.historial.clear()
+
+        # 🔹 También reiniciar estructuras anidadas si existen
+        if hasattr(self.controller, "estructura_anidada"):
+            self.controller.estructura_anidada = []
+
+        if hasattr(self.controller, "colisiones_controller"):
+            cc = self.controller.colisiones_controller
+            cc.estructura = [None] * getattr(cc, "tamaño", 0)
+            cc.estructura_anidada = [None] * getattr(cc, "tamaño", 0)
+            cc.ultima_estrategia = None
+            cc.estrategia_fijada = False
+
+        # 🔹 Limpiar estrategia
+        self.controller.ultima_estrategia = None
+
+        # 🔹 Limpiar estrategia visual si existe
+        if hasattr(self, "estrategia_label"):
+            self.estrategia_label.setText("Sin estrategia seleccionada")
+
+        # 🔹 Reiniciar variables internas
+        self.labels.clear()
+        self.capacidad = 0
+
+        # 🔓 DESBLOQUEAR controles de rango y dígitos para permitir crear nueva estructura
+        self.rango.setEnabled(True)
+        self.digitos.setEnabled(True)
+
+        # 🔹 Actualizar vista vacía
+        self.grid.update()
+        self.scroll.update()
+
+        dialogo = DialogoClave(
+            longitud=0,
+            titulo="Éxito",
+            modo="mensaje",
+            parent=self,
+            mensaje="Estructura eliminada correctamente."
+        )
+        dialogo.exec()
+
+    def buscar_clave(self):
+        """Busca una clave en la estructura (principal y anidada)."""
+        dialogo = DialogoClave(
+            longitud=self.digitos.value(),
+            titulo="Buscar clave",
+            modo="buscar",
+            parent=self
+        )
+        if dialogo.exec() != QDialog.Accepted:
+            return
+
+        clave = dialogo.get_clave()
+        estructura = self.controller.estructura
+        anidados = self.controller.estructura_anidada
+
+        encontrado = None
+        detalle = ""
+
+        # 🔹 Buscar en el arreglo principal
+        for pos, valor in estructura.items():
+            if str(valor).strip() == clave:
+                encontrado = pos
+                detalle = f"en el arreglo principal (posición {pos})"
+                break
+
+        # 🔹 Buscar en los arreglos/listas anidadas si no está en el principal
+        if not encontrado and isinstance(anidados, list):
+            for i, sublista in enumerate(anidados):
+                if not sublista:
+                    continue
+
+                # Convertir todos los elementos a str para comparar
+                sublista_str = [str(x).strip() for x in sublista if x is not None]
+
+                if clave in sublista_str:
+                    encontrado = i + 1  # posición principal (1-based)
+                    indice_anidado = sublista_str.index(clave)
+
+                    # Diferenciar el mensaje según la estrategia
+                    estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+                    if estrategia_actual == "Lista encadenada":
+                        detalle = f"en la lista encadenada de la posición {i + 1}, nodo #{indice_anidado + 1}"
+                    else:
+                        detalle = f"en el arreglo anidado de la posición {i + 1}, índice interno {indice_anidado + 1}"
+                    break
+
+        # 🔹 Resultado final
+        if encontrado:
+            dialogo_resultado = DialogoClave(
+                longitud=0,
+                titulo="Resultado",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Clave {clave} encontrada {detalle}."
+            )
+            dialogo_resultado.exec()
         else:
-            QMessageBox.critical(self, "Error", f"Ocurrió un problema: {resultado}")
+            dialogo_resultado = DialogoClave(
+                longitud=0,
+                titulo="Resultado",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Clave {clave} no encontrada en la estructura."
+            )
+            dialogo_resultado.exec()
+        estructura = self.controller.estructura
+        anidados = self.controller.estructura_anidada
+
+        encontrado = None
+        detalle = ""
+
+        # 🔹 Buscar en el arreglo principal
+        for pos, valor in estructura.items():
+            if str(valor).strip() == clave:
+                encontrado = pos
+                detalle = f"en el arreglo principal (posición {pos})"
+                break
+
+        # 🔹 Buscar en los arreglos/listas anidadas si no está en el principal
+        if not encontrado and isinstance(anidados, list):
+            for i, sublista in enumerate(anidados):
+                if not sublista:
+                    continue
+
+                # Convertir todos los elementos a str para comparar
+                sublista_str = [str(x).strip() for x in sublista if x is not None]
+
+                if clave in sublista_str:
+                    encontrado = i + 1  # posición principal (1-based)
+                    indice_anidado = sublista_str.index(clave)
+
+                    # Diferenciar el mensaje según la estrategia
+                    estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+                    if estrategia_actual == "Lista encadenada":
+                        detalle = f"en la lista encadenada de la posición {i + 1}, nodo #{indice_anidado + 1}"
+                    else:
+                        detalle = f"en el arreglo anidado de la posición {i + 1}, índice interno {indice_anidado + 1}"
+                    break
+
+        # 🔹 Resultado final
+        if encontrado:
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Resultado",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Clave {clave} encontrada {detalle}."
+            )
+            dialogo.exec()
+        else:
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Resultado",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Clave {clave} no encontrada en la estructura."
+            )
+            dialogo.exec()
+
+    def eliminar_clave(self):
+        """Elimina una clave de la estructura (principal o anidada)."""
+        dialogo = DialogoClave(
+            longitud=self.digitos.value(),
+            titulo="Eliminar clave",
+            modo="eliminar",
+            parent=self
+        )
+        if dialogo.exec() != QDialog.Accepted:
+            return
+
+        clave = dialogo.get_clave()
+        eliminada = False
+
+        # Guardar estado antes de eliminar
+        self.controller._guardar_estado()
+
+        # --- Intentar eliminar del arreglo principal ---
+        estructura = self.controller.estructura
+        posiciones_a_borrar = [pos for pos, val in estructura.items() if str(val).strip() == clave]
+
+        if posiciones_a_borrar:
+            for pos in posiciones_a_borrar:
+                estructura[pos] = ""  # limpiar
+
+                # También limpiar en el controlador de colisiones si existe
+                if self.controller.colisiones_controller:
+                    idx = pos - 1
+                    self.controller.colisiones_controller.estructura[idx] = None
+
+            eliminada = True
+
+        # --- Intentar eliminar de los arreglos/listas anidadas ---
+        anidados = self.controller.estructura_anidada
+        if isinstance(anidados, list):
+            for i, sublista in enumerate(anidados):
+                if not sublista:
+                    continue
+
+                # Convertir a strings para comparar
+                sublista_str = [str(x).strip() for x in sublista if x is not None]
+
+                if clave in sublista_str:
+                    # Encontrar el índice del elemento original (no el string)
+                    for j, elem in enumerate(sublista):
+                        if elem is not None and str(elem).strip() == clave:
+                            del sublista[j]
+                            eliminada = True
+
+                            # Sincronizar con el controlador de colisiones
+                            if self.controller.colisiones_controller:
+                                self.controller.colisiones_controller.estructura_anidada[i] = sublista.copy()
+
+                            break
+                    break
+
+        # --- Resultado final ---
+        if eliminada:
+            # Actualizar controlador
+            self.controller.estructura = estructura
+            self.controller.estructura_anidada = anidados
+
+            # Guardar cambios
+            self.controller.guardar()
+
+            # Actualizar vista según estrategia
+            estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+
+            if estrategia_actual == "Arreglo anidado":
+                self.actualizar_vista_anidada()
+            elif estrategia_actual == "Lista encadenada":
+                self.actualizar_vista_encadenada()
+            else:
+                self.actualizar_tabla()
+
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Éxito",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"La clave {clave} fue eliminada correctamente."
+            )
+            dialogo.exec()
+        else:
+            # Si no se eliminó nada, remover el estado guardado del historial
+            if self.controller.historial:
+                self.controller.historial.pop()
+
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"La clave {clave} no existe en la estructura."
+            )
+            dialogo.exec()
 
     def deshacer(self):
+        """Deshace el último movimiento (compatible con todas las estrategias)."""
         resultado = self.controller.deshacer()
-        if resultado == "OK":
-            QMessageBox.information(self, "Éxito", "Se deshizo el último movimiento.")
-            self.actualizar_tabla()
+
+        if isinstance(resultado, dict):
+            # 🧩 Caso extendido: el controlador devolvió un estado completo
+            self.controller.estructura = resultado.get("estructura", self.controller.estructura)
+            self.controller.estructura_anidada = resultado.get("estructura_anidada",
+                                                               getattr(self.controller, "estructura_anidada", []))
+
+            # Restaurar en el controlador de colisiones también
+            if self.controller.colisiones_controller:
+                # Reconstruir estructura principal del controlador
+                self.controller.colisiones_controller.estructura = [None] * self.controller.capacidad
+                for pos, valor in self.controller.estructura.items():
+                    if valor and valor != "":
+                        idx = pos - 1
+                        try:
+                            self.controller.colisiones_controller.estructura[idx] = int(valor)
+                        except ValueError:
+                            self.controller.colisiones_controller.estructura[idx] = valor
+
+                # Restaurar estructura anidada del controlador
+                self.controller.colisiones_controller.estructura_anidada = [
+                    lst.copy() if lst else [] for lst in self.controller.estructura_anidada
+                ]
+
+            # 🔁 Refrescar la vista según la estrategia activa
+            estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+
+            if estrategia_actual == "Arreglo anidado":
+                self.actualizar_vista_anidada()
+            elif estrategia_actual == "Lista encadenada":
+                self.actualizar_vista_encadenada()
+            else:
+                self.actualizar_tabla()
+
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Éxito",
+                modo="mensaje",
+                parent=self,
+                mensaje="Se deshizo el último movimiento."
+            )
+            dialogo.exec()
+
+        elif resultado == "OK":
+            # 🔹 Versión simple (antiguo comportamiento)
+            estrategia_actual = getattr(self.controller, "ultima_estrategia", "")
+
+            if estrategia_actual == "Arreglo anidado":
+                self.actualizar_vista_anidada()
+            elif estrategia_actual == "Lista encadenada":
+                self.actualizar_vista_encadenada()
+            else:
+                self.actualizar_tabla()
+
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Éxito",
+                modo="mensaje",
+                parent=self,
+                mensaje="Se deshizo el último movimiento."
+            )
+            dialogo.exec()
+
         elif resultado == "VACIO":
-            QMessageBox.warning(self, "Aviso", "No hay movimientos para deshacer.")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Aviso",
+                modo="mensaje",
+                parent=self,
+                mensaje="No hay movimientos para deshacer."
+            )
+            dialogo.exec()
+
         else:
-            QMessageBox.critical(self, "Error", f"Ocurrió un error: {resultado}")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Ocurrió un error: {resultado}"
+            )
+            dialogo.exec()
 
     def guardar_estructura(self):
         # sugerimos nombre por defecto
@@ -362,84 +802,129 @@ class ModInterna(QMainWindow):
         try:
             self.controller.ruta_archivo = ruta
             self.controller.guardar()
-            QMessageBox.information(self, "Éxito", f"Estructura guardada en:\n{ruta}")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Éxito",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"Estructura guardada en:\n{ruta}"
+            )
+            dialogo.exec()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar la estructura:\n{e}")
+            dialogo = DialogoClave(
+                longitud=0,
+                titulo="Error",
+                modo="mensaje",
+                parent=self,
+                mensaje=f"No se pudo guardar la estructura:\n{e}"
+            )
+            dialogo.exec()
 
     def actualizar_vista_anidada(self, modo="vertical"):
-        """Dibuja el arreglo principal completo y muestra colisiones a la derecha."""
+        """Dibuja el arreglo principal con sus arreglos anidados pegados visualmente."""
         # Limpiar grid
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
 
+        # --- Ajustes del grid principal ---
+        self.grid.setHorizontalSpacing(0)
+        self.grid.setVerticalSpacing(5)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+
+        # --- Datos ---
         estructura = self.controller.estructura or {}
         anidados = getattr(self.controller, "estructura_anidada", [])
-
-        # 🔹 Garantizar longitud igual a la capacidad
         if not isinstance(anidados, list):
             anidados = []
+
         if len(anidados) != self.controller.capacidad:
             anidados = (anidados + [[]] * self.controller.capacidad)[:self.controller.capacidad]
 
-        # 🔹 Calcular el número máximo de columnas anidadas existentes
-        max_colisiones = max((len(sublista) for sublista in anidados), default=0)
-
-        # --- Títulos ---
-        # --- Título combinado ---
+        # --- Calcular el máximo global de colisiones (para dibujar estructura completa) ---
+        max_colisiones_global = max((len(sublista) for sublista in anidados), default=0)
+        # --- Título ---
+        # --- Título ---
         titulo = QLabel("Arreglo principal  |  Arreglos anidados (colisiones)")
         titulo.setAlignment(Qt.AlignCenter)
-        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #4C1D95;")
-        self.grid.addWidget(titulo, 0, 0, 1, max_colisiones + 2, alignment=Qt.AlignCenter)
+        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #4C1D95; margin-bottom: 15px;")
+        self.grid.addWidget(titulo, 0, 0, alignment=Qt.AlignCenter)
 
-        # --- Estructura principal + anidados ---
+        # --- Construcción visual fila por fila ---
+        fila_actual = 1
         for fila in range(1, self.controller.capacidad + 1):
+            fila_layout = QHBoxLayout()
+            fila_layout.setSpacing(0)
+            fila_layout.setContentsMargins(0, 0, 0, 0)
+
+            # ---------------- Celda principal ----------------
             val = estructura.get(fila, "")
             texto = str(val).zfill(self.controller.digitos) if val else ""
             celda = QLabel(texto)
-            celda.setAlignment(Qt.AlignCenter)
             celda.setFixedSize(70, 70)
+            celda.setAlignment(Qt.AlignCenter)
             celda.setStyleSheet("""
-                background-color: #EDE9FE;
-                border: 2px solid #7C3AED;
-                border-radius: 10px;
-                font-size: 16px;
-            """)
-            self.grid.addWidget(celda, fila, 0, alignment=Qt.AlignCenter)
-
-            # índice
-            idx = QLabel(str(fila))
-            idx.setAlignment(Qt.AlignCenter)
-            idx.setStyleSheet("color: gray; font-size: 12px;")
-            self.grid.addWidget(idx, fila + 1, 0, alignment=Qt.AlignTop | Qt.AlignCenter)
-
-            # --- Colisiones (relleno completo por columnas) ---
-            sublista = anidados[fila - 1] if fila - 1 < len(anidados) else []
-            for j in range(1, max_colisiones + 1):
-                if j <= len(sublista):
-                    # Celda con valor real
-                    texto = str(sublista[j - 1]).zfill(self.controller.digitos)
-                    estilo = """
-                        background-color: #DDD6FE;
+                        background-color: #EDE9FE;
                         border: 2px solid #7C3AED;
                         border-radius: 10px;
                         font-size: 16px;
-                    """
+                    """)
+            fila_layout.addWidget(celda)
+
+            # ---------------- Arreglos anidados ----------------
+            sublista = anidados[fila - 1] if fila - 1 < len(anidados) else []
+
+            for j in range(max_colisiones_global):
+                if j < len(sublista):
+                    texto = str(sublista[j]).zfill(self.controller.digitos)
+                    estilo = """
+                                background-color: #DDD6FE;
+                                border: 2px solid #7C3AED;
+                                border-left: none;
+                                border-radius: 10px;
+                                font-size: 16px;
+                            """
                 else:
-                    # Celda vacía (guía)
                     texto = ""
                     estilo = """
-                        border: 2px dashed #C4B5FD;
-                        background-color:#F5F3FF;
-                        border-radius:10px;
-                    """
+                                border: 2px dashed #C4B5FD;
+                                border-left: none;
+                                background-color: #F5F3FF;
+                                border-radius: 10px;
+                            """
 
                 lbl = QLabel(texto)
-                lbl.setAlignment(Qt.AlignCenter)
                 lbl.setFixedSize(70, 70)
+                lbl.setAlignment(Qt.AlignCenter)
                 lbl.setStyleSheet(estilo)
-                self.grid.addWidget(lbl, fila, j + 1, alignment=Qt.AlignCenter)
+                fila_layout.addWidget(lbl)
+
+            # ---------------- Índice a la izquierda ----------------
+            fila_layout_con_indice = QHBoxLayout()
+            fila_layout_con_indice.setSpacing(10)
+            fila_layout_con_indice.setContentsMargins(0, 0, 0, 0)
+
+            # Etiqueta de índice al lado izquierdo
+            idx = QLabel(str(fila))
+            idx.setAlignment(Qt.AlignCenter)
+            idx.setFixedWidth(30)
+            idx.setStyleSheet("""
+                        color: #7C3AED;
+                        font-size: 13px;
+                        font-weight: bold;
+                    """)
+            fila_layout_con_indice.addWidget(idx)
+
+            # Agregar el layout original de la fila (principal + anidados)
+            fila_layout_con_indice.addLayout(fila_layout)
+
+            # Contenedor final de toda la fila
+            fila_contenedor = QWidget()
+            fila_contenedor.setLayout(fila_layout_con_indice)
+            self.grid.addWidget(fila_contenedor, fila_actual, 0, alignment=Qt.AlignLeft)
+
+            fila_actual += 1
 
     def actualizar_tabla(self):
         """Actualiza la vista para arreglos anidados (colisiones)."""
@@ -522,3 +1007,88 @@ class ModInterna(QMainWindow):
             pos = idx + 1
             val = estructura.get(pos, "")
             cuadro.setText(val if val else "")
+
+    def actualizar_vista_encadenada(self):
+        """Dibuja visualmente la estructura con listas encadenadas."""
+        # Limpiar grid
+        for i in reversed(range(self.grid.count())):
+            widget = self.grid.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        # --- Título ---
+        titulo = QLabel("Visualización: Lista Encadenada (colisiones con punteros)")
+        titulo.setAlignment(Qt.AlignCenter)
+        titulo.setStyleSheet("""
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #4C1D95;
+                    margin-bottom: 15px;
+                """)
+        self.grid.addWidget(titulo, 0, 0, alignment=Qt.AlignCenter)
+
+        fila_actual = 1
+
+        for fila in range(1, self.controller.capacidad + 1):
+            # Obtener valor principal (indexado desde 1)
+            val = self.controller.estructura.get(fila, "")
+
+            # Obtener sublista (indexada desde 0)
+            sublista = self.controller.estructura_anidada[fila - 1] if fila - 1 < len(
+                self.controller.estructura_anidada) else []
+
+            # Asegurar que sublista sea una lista
+            if sublista is None:
+                sublista = []
+            elif not isinstance(sublista, list):
+                sublista = []
+
+            fila_layout = QHBoxLayout()
+            fila_layout.setSpacing(10)
+            fila_layout.setContentsMargins(0, 0, 0, 0)
+
+            # Nodo principal
+            nodo = QLabel(str(val).zfill(self.controller.digitos) if val != "" else "")
+            nodo.setFixedSize(70, 70)
+            nodo.setAlignment(Qt.AlignCenter)
+            nodo.setStyleSheet("""
+                        background-color: #EDE9FE;
+                        border: 2px solid #7C3AED;
+                        border-radius: 10px;
+                        font-size: 16px;
+                    """)
+            fila_layout.addWidget(nodo)
+
+            # Dibujar flechas y nodos encadenados
+            for clave in sublista:
+                flecha = QLabel("→")
+                flecha.setAlignment(Qt.AlignCenter)
+                flecha.setStyleSheet("font-size: 20px; color: #7C3AED;")
+                fila_layout.addWidget(flecha)
+
+                nodo_col = QLabel(str(clave).zfill(self.controller.digitos))
+                nodo_col.setFixedSize(70, 70)
+                nodo_col.setAlignment(Qt.AlignCenter)
+                nodo_col.setStyleSheet("""
+                            background-color: #DDD6FE;
+                            border: 2px solid #7C3AED;
+                            border-radius: 10px;
+                            font-size: 16px;
+                        """)
+                fila_layout.addWidget(nodo_col)
+
+            # Índice a la izquierda
+            idx = QLabel(str(fila))
+            idx.setAlignment(Qt.AlignCenter)
+            idx.setFixedWidth(30)
+            idx.setStyleSheet("color: #7C3AED; font-size: 13px; font-weight: bold;")
+
+            fila_layout_final = QHBoxLayout()
+            fila_layout_final.addWidget(idx)
+            fila_layout_final.addLayout(fila_layout)
+
+            contenedor_fila = QWidget()
+            contenedor_fila.setLayout(fila_layout_final)
+            self.grid.addWidget(contenedor_fila, fila_actual, 0, alignment=Qt.AlignLeft)
+
+            fila_actual += 1

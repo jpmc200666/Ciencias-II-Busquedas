@@ -11,32 +11,31 @@ class ModController:
         self.digitos = 0
         self.historial = []
         self.colisiones_controller = None
-        self.estructura_anidada = []  # estructura independiente para arreglo anidado
+        self.estructura_anidada = []
         self.ultima_estrategia = None
 
         os.makedirs(os.path.dirname(self.ruta_archivo), exist_ok=True)
 
     def _guardar_estado(self):
         """Guarda el estado actual en el historial para poder deshacer."""
-        self.historial.append(self.estructura.copy())
+        self.historial.append({
+            "estructura": self.estructura.copy(),
+            "estructura_anidada": [lst.copy() if lst else [] for lst in self.estructura_anidada]
+        })
 
     def crear_estructura(self, capacidad: int, digitos: int, metodo_hash="mod"):
         """Crea una nueva estructura hash."""
         self.capacidad = capacidad
         self.digitos = digitos
-        # estructura indexada desde 1 .. capacidad (más intuitivo para la vista)
         self.estructura = {i: "" for i in range(1, capacidad + 1)}
         self.historial.clear()
-        # crear controlador de colisiones (usa índices 0..capacidad-1 internamente)
         self.colisiones_controller = ColisionesController(capacidad, metodo_hash)
 
-        # normalizar estructura_anidada a lista de listas (no None)
-        raw_anidada = getattr(self.colisiones_controller, "estructura_anidada", None)
-        if raw_anidada is None:
-            self.estructura_anidada = [[] for _ in range(capacidad)]
-        else:
-            # convertir posibles None a listas vacías
-            self.estructura_anidada = [lst if lst else [] for lst in raw_anidada]
+        # Inicializar estructura_anidada como lista de listas vacías
+        self.estructura_anidada = [[] for _ in range(capacidad)]
+
+        # Sincronizar con el controlador
+        self.colisiones_controller.estructura_anidada = [[] for _ in range(capacidad)]
 
         self.guardar()
 
@@ -51,35 +50,53 @@ class ModController:
             clave_int = int(clave)
             self._guardar_estado()
 
-            # calcular posición 0-based con el colisiones_controller
             pos_base = self.colisiones_controller.calcular_posicion(clave_int)
 
-            # si la posición primaria está vacía -> insertar en principal
+            # Si la posición primaria está vacía
             if self.colisiones_controller.estructura[pos_base] is None:
                 self.colisiones_controller.estructura[pos_base] = clave_int
                 self.estructura[pos_base + 1] = str(clave).zfill(self.digitos)
                 self.guardar()
                 return "OK"
 
-            # hay colisión
+            # Hay colisión
             if estrategia is None:
                 self.historial.pop()
                 return "COLISION"
 
-            # registrar estrategia
+            # Registrar estrategia
             self.ultima_estrategia = estrategia
 
-            # --- Arreglo anidado: usar el controlador de colisiones para insertar ---
-            if estrategia == "Arreglo anidado":
-                # delegar en ColisionesController (que debe crear/añadir en estructura_anidada[pos_base])
+            # --- Lista encadenada ---
+            if estrategia == "Lista encadenada":
                 pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
 
-                # sincronizar estructura_anidada desde el controlador (convertir None->[])
-                raw = getattr(self.colisiones_controller, "estructura_anidada", [])
-                self.estructura_anidada = [lst if lst else [] for lst in raw]
+                # 🔹 SINCRONIZAR estructura_anidada desde el controlador
+                raw = self.colisiones_controller.estructura_anidada
+                self.estructura_anidada = [lst.copy() if lst else [] for lst in raw]
 
-                # (no removemos ni cambiamos la estructura principal; sólo se añade en anidados)
-                # formatear visualmente la estructura principal (ceros a la izquierda)
+                # Actualizar estructura principal (mantener formato)
+                for i in range(1, self.capacidad + 1):
+                    val = self.estructura.get(i, "")
+                    if val and str(val).isdigit():
+                        self.estructura[i] = str(val).zfill(self.digitos)
+
+                print(f"[DEBUG] Después de insertar '{clave}' en pos {pos_base}:")
+                print(f"  estructura[{pos_base + 1}] = {self.estructura.get(pos_base + 1)}")
+                print(f"  estructura_anidada[{pos_base}] = {self.estructura_anidada[pos_base]}")
+
+                self.guardar()
+                return "OK"
+
+            # --- Arreglo anidado ---
+            if estrategia == "Arreglo anidado":
+                pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
+
+                # Sincronizar estructura_anidada
+                raw = self.colisiones_controller.estructura_anidada
+                self.estructura_anidada = [lst.copy() if lst else [] for lst in raw]
+
+                # Formatear estructura principal
                 for i in range(1, self.capacidad + 1):
                     val = self.estructura.get(i, "")
                     if val and str(val).isdigit():
@@ -88,7 +105,7 @@ class ModController:
                 self.guardar()
                 return "OK"
 
-            # --- Otras estrategias (lineal/cuadrática/doble): delegar y sincronizar ---
+            # --- Otras estrategias (lineal/cuadrática/doble) ---
             pos_final, hubo_colision = self.colisiones_controller.insertar(clave_int, estrategia)
             self._sincronizar_estructura()
             self.guardar()
@@ -112,13 +129,31 @@ class ModController:
                 self.estructura[i + 1] = ""
 
     def deshacer(self):
-        """Deshace el último cambio."""
+        """Deshace el último cambio (restaura estructura principal y anidada)."""
         if not self.historial:
             return "VACIO"
-        self.estructura = self.historial.pop()
 
+        estado_anterior = self.historial.pop()
+
+        # Restaurar estructura principal
+        self.estructura = estado_anterior["estructura"].copy()
+
+        # Restaurar estructura anidada
+        self.estructura_anidada = [
+            lst.copy() if lst else []
+            for lst in estado_anterior["estructura_anidada"]
+        ]
+
+        # Sincronizar con el controlador de colisiones
         if self.colisiones_controller:
+            # Limpiar estructura del controlador
             self.colisiones_controller.estructura = [None] * self.capacidad
+            self.colisiones_controller.estructura_anidada = [
+                lst.copy() if lst else []
+                for lst in self.estructura_anidada
+            ]
+
+            # Reconstruir estructura principal del controlador
             for pos, valor in self.estructura.items():
                 if valor and valor != "":
                     idx = pos - 1
@@ -126,14 +161,24 @@ class ModController:
                         self.colisiones_controller.estructura[idx] = int(valor)
                     except ValueError:
                         self.colisiones_controller.estructura[idx] = valor
+
+        # Guardar estado restaurado
         self.guardar()
-        return "OK"
+
+        # Retornar dict con el estado completo para la vista
+        return {
+            "estructura": self.estructura,
+            "estructura_anidada": self.estructura_anidada,
+            "capacidad": self.capacidad,
+            "digitos": self.digitos
+        }
 
     def eliminar_clave(self, clave: str) -> str:
         """Elimina una clave si existe en la estructura."""
         clave = str(clave)
         encontrada = False
 
+        # Eliminar de la estructura principal
         for k, v in list(self.estructura.items()):
             if str(v) == clave:
                 encontrada = True
@@ -143,15 +188,18 @@ class ModController:
                 if self.colisiones_controller:
                     idx = k - 1
                     self.colisiones_controller.estructura[idx] = None
-
-                # También eliminar de estructura anidada si existe
-                self.estructura_anidada = [
-                    sub for sub in self.estructura_anidada if clave not in sub
-                ]
-
-                self.guardar()
                 break
 
+        # Eliminar de cada sublista anidada
+        for i, sub in enumerate(self.estructura_anidada):
+            if sub and clave in [str(x) for x in sub]:
+                encontrada = True
+                sub.remove(int(clave))
+                # Sincronizar con el controlador
+                if self.colisiones_controller:
+                    self.colisiones_controller.estructura_anidada[i] = sub.copy()
+
+        self.guardar()
         return "OK" if encontrada else "NO_EXISTE"
 
     def guardar(self):
@@ -160,7 +208,8 @@ class ModController:
             "capacidad": self.capacidad,
             "digitos": self.digitos,
             "estructura": self.estructura,
-            "estructura_anidada": self.estructura_anidada
+            "estructura_anidada": self.estructura_anidada,
+            "ultima_estrategia": self.ultima_estrategia
         }
         ManejadorArchivos.guardar_json(self.ruta_archivo, datos)
 
@@ -172,8 +221,16 @@ class ModController:
             self.digitos = datos.get("digitos", 0)
             self.estructura = {int(k): v for k, v in datos.get("estructura", {}).items()}
             self.estructura_anidada = datos.get("estructura_anidada", [])
+            self.ultima_estrategia = datos.get("ultima_estrategia", None)
+
+            # Crear nuevo controlador de colisiones
             self.colisiones_controller = ColisionesController(self.capacidad, "mod")
 
+            # Copiar estructura anidada al controlador
+            self.colisiones_controller.estructura_anidada = [lst.copy() if lst else [] for lst in
+                                                             self.estructura_anidada]
+
+            # Reconstruir el arreglo principal
             for pos, valor in self.estructura.items():
                 if valor and valor != "":
                     idx = pos - 1
@@ -181,6 +238,7 @@ class ModController:
                         self.colisiones_controller.estructura[idx] = int(valor)
                     except ValueError:
                         self.colisiones_controller.estructura[idx] = valor
+
             return True
         return False
 

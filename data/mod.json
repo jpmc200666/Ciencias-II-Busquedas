@@ -2,7 +2,7 @@
     "capacidad": 10,
     "digitos": 4,
     "estructura": {
-        "1": "1020",
+        "1": "",
         "2": "",
         "3": "",
         "4": "",
@@ -15,7 +15,7 @@
     },
     "estructura_anidada": [
         [
-            20
+            0
         ],
         [],
         [],
@@ -26,5 +26,6 @@
         [],
         [],
         []
-    ]
+    ],
+    "ultima_estrategia": "Arreglo anidado"
 }
