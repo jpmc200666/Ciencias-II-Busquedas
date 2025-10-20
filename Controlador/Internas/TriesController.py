@@ -14,16 +14,16 @@ CODIGO_BINARIO = {
 
 class TrieNode:
     def __init__(self, letra=None, is_link=False):
-        self.is_link = is_link     # True -> nodo de enlace '*' (por bit)
-        self.letra = letra         # si es hoja guarda la letra (ej. 'A')
-        self.children = {}         # claves: '0','1', o 'L<LETRA>' para hoja
+        self.is_link = is_link  # True -> nodo de enlace '*'
+        self.letra = letra  # letra almacenada (A-Z) si es nodo hoja
+        self.children = {}  # hijos del nodo
 
 
 class TriesController:
     def __init__(self):
-        self.root = TrieNode(is_link=True)
-        # usar CODIGO_BINARIO tal cual (llaves mayúsculas)
+        self.root = TrieNode(is_link=True)  # raíz siempre es '*'
         self.codigos = CODIGO_BINARIO
+        self.letras_insertadas = set()  # mantener registro de letras insertadas
 
     def insertar(self, palabra: str):
         if not palabra:
@@ -33,36 +33,165 @@ class TriesController:
             if ch not in self.codigos:
                 raise ValueError(f"Letra no válida: {ch}")
             self._insertar_letra(ch)
+            self.letras_insertadas.add(ch)
         return "OK"
 
     def _insertar_letra(self, letra: str):
         codigo = self.codigos[letra]
         nodo = self.root
+        pos = 0
 
-        # CREAR un nodo '*' para CADA bit (incluido el último)
-        for bit in codigo:
+        while pos < len(codigo):
+            bit = codigo[pos]
+
+            # Si no existe el hijo con ese bit
             if bit not in nodo.children:
-                nodo.children[bit] = TrieNode(is_link=True)
-            nodo = nodo.children[bit]
+                # Insertar la letra aquí
+                nodo.children[bit] = TrieNode(letra=letra, is_link=False)
+                return
 
-        # ahora colgamos la hoja con la letra como hijo especial
-        leaf_key = f"L{letra}"   # ej. 'LA' para la letra 'A'
-        if leaf_key not in nodo.children:
-            nodo.children[leaf_key] = TrieNode(letra=letra, is_link=False)
+            # Si existe el hijo
+            hijo = nodo.children[bit]
 
-    def buscar(self, letra: str) -> bool:
+            # Si es un nodo de enlace '*', continuamos bajando
+            if hijo.is_link:
+                nodo = hijo
+                pos += 1
+                continue
+
+            # Si es un nodo con letra -> HAY COLISIÓN
+            letra_existente = hijo.letra
+
+            # Si es la misma letra, ya existe
+            if letra == letra_existente:
+                return
+
+            # COLISIÓN: convertir el nodo en enlace '*'
+            hijo.is_link = True
+            letra_vieja = hijo.letra
+            hijo.letra = None
+
+            # Obtener códigos de ambas letras
+            codigo_vieja = self.codigos[letra_vieja]
+            codigo_nueva = codigo
+
+            # Re-insertar AMBAS letras desde la siguiente posición
+            pos_siguiente = pos + 1
+
+            # Insertar letra vieja
+            self._insertar_desde_posicion(hijo, letra_vieja, codigo_vieja, pos_siguiente)
+
+            # Insertar letra nueva
+            self._insertar_desde_posicion(hijo, letra, codigo_nueva, pos_siguiente)
+
+            return
+
+    def _insertar_desde_posicion(self, nodo, letra, codigo, pos):
+        """Inserta una letra desde una posición específica del código"""
+        nodo_actual = nodo
+
+        while pos < len(codigo):
+            bit = codigo[pos]
+
+            # Si no existe el hijo
+            if bit not in nodo_actual.children:
+                nodo_actual.children[bit] = TrieNode(letra=letra, is_link=False)
+                return
+
+            # Si existe el hijo
+            hijo = nodo_actual.children[bit]
+
+            # Si es un nodo de enlace, continuamos
+            if hijo.is_link:
+                nodo_actual = hijo
+                pos += 1
+                continue
+
+            # Si es un nodo con letra -> OTRA COLISIÓN
+            if hijo.letra == letra:
+                # Ya existe
+                return
+
+            # Convertir en enlace y continuar
+            letra_existente_ahi = hijo.letra
+            codigo_existente_ahi = self.codigos[letra_existente_ahi]
+
+            hijo.is_link = True
+            hijo.letra = None
+
+            # Re-insertar recursivamente
+            self._insertar_desde_posicion(hijo, letra_existente_ahi, codigo_existente_ahi, pos + 1)
+
+            # Continuar con la letra actual
+            nodo_actual = hijo
+            pos += 1
+
+    def buscar(self, letra: str):
+        """
+        Busca una letra y retorna la posición (secuencia de bits) donde se encuentra.
+        Retorna: (encontrada: bool, posicion: str, nodo: TrieNode o None)
+        """
         letra = letra.upper()
         if letra not in self.codigos:
-            return False
+            return (False, "", None)
+
         codigo = self.codigos[letra]
         nodo = self.root
-        for bit in codigo:
+        pos = 0
+        posicion = ""  # Acumular la secuencia de bits
+
+        while pos < len(codigo):
+            bit = codigo[pos]
+
             if bit not in nodo.children:
-                return False
-            nodo = nodo.children[bit]
-        leaf_key = f"L{letra}"
-        return leaf_key in nodo.children and nodo.children[leaf_key].letra == letra
+                return (False, "", None)
+
+            hijo = nodo.children[bit]
+            posicion += bit  # Agregar el bit a la posición
+
+            # Si es un nodo de enlace, seguimos bajando
+            if hijo.is_link:
+                nodo = hijo
+                pos += 1
+                continue
+
+            # Si es un nodo con letra, verificamos si es la que buscamos
+            if hijo.letra == letra:
+                return (True, posicion, hijo)
+            else:
+                return (False, "", None)
+
+        return (False, "", None)
+
+    def eliminar(self, letra: str):
+        """Elimina una letra y reconstruye el árbol"""
+        letra = letra.upper()
+        if letra not in self.codigos:
+            raise ValueError(f"Letra no válida: {letra}")
+
+        if letra not in self.letras_insertadas:
+            raise ValueError(f"La letra {letra} no está en el Trie")
+
+        # Eliminar la letra del conjunto
+        self.letras_insertadas.discard(letra)
+
+        # Reconstruir el árbol desde cero con las letras restantes
+        self._reconstruir()
+
+        return "OK"
+
+    def _reconstruir(self):
+        """Reconstruye el árbol con las letras actuales"""
+        # Guardar las letras actuales
+        letras_temp = list(self.letras_insertadas)
+
+        # Limpiar el árbol
+        self.root = TrieNode(is_link=True)
+
+        # Re-insertar todas las letras
+        for letra in letras_temp:
+            self._insertar_letra(letra)
 
     def limpiar(self):
         self.root = TrieNode(is_link=True)
-
+        self.letras_insertadas.clear()

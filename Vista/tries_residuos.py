@@ -14,9 +14,10 @@ class TriesResiduos(QMainWindow):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
         self.controller = TriesController()
+        self.nodo_resaltado = None  # Para resaltar el nodo buscado
 
         self.setWindowTitle("Ciencias de la Computación II - Tries por Residuos")
-        self.resize(1100, 700)
+        self.resize(1200, 750)
 
         # =================== WIDGET CENTRAL ===================
         central = QWidget()
@@ -88,9 +89,8 @@ class TriesResiduos(QMainWindow):
         self.view.setStyleSheet("background-color: #F3E8FF; border-radius: 8px;")
 
         self.view.resetTransform()
-        self.view.scale(1.5, 1.5)  # Zoom para que se vea más grande
+        self.view.scale(1.5, 1.5)
         body_layout.addWidget(self.view, stretch=2)
-
 
         # --- DERECHA: Controles ---
         controls_frame = QFrame()
@@ -101,9 +101,10 @@ class TriesResiduos(QMainWindow):
             }
         """)
         controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(20)
+        controls_layout.setSpacing(15)
         controls_layout.setAlignment(Qt.AlignTop)
 
+        # === INSERTAR ===
         lbl_insertar = QLabel("Insertar Palabra:")
         lbl_insertar.setStyleSheet("font-size: 14px; color: #4C1D95; font-weight: bold;")
 
@@ -113,10 +114,34 @@ class TriesResiduos(QMainWindow):
         btn_insertar = QPushButton("Insertar")
         btn_insertar.clicked.connect(self.insertar_palabra)
 
+        # === BUSCAR ===
+        lbl_buscar = QLabel("Buscar Letra:")
+        lbl_buscar.setStyleSheet("font-size: 14px; color: #4C1D95; font-weight: bold;")
+
+        self.input_buscar = QLineEdit()
+        self.input_buscar.setPlaceholderText("Ingrese letra (A-Z)")
+        self.input_buscar.setMaxLength(1)
+
+        btn_buscar = QPushButton("Buscar")
+        btn_buscar.clicked.connect(self.buscar_letra)
+
+        # === ELIMINAR ===
+        lbl_eliminar = QLabel("Eliminar Letra:")
+        lbl_eliminar.setStyleSheet("font-size: 14px; color: #4C1D95; font-weight: bold;")
+
+        self.input_eliminar = QLineEdit()
+        self.input_eliminar.setPlaceholderText("Ingrese letra (A-Z)")
+        self.input_eliminar.setMaxLength(1)
+
+        btn_eliminar = QPushButton("Eliminar")
+        btn_eliminar.clicked.connect(self.eliminar_letra)
+
+        # === LIMPIAR ===
         btn_limpiar = QPushButton("Limpiar Trie")
         btn_limpiar.clicked.connect(self.limpiar_trie)
 
-        for btn in (btn_insertar, btn_limpiar):
+        # Estilos para botones
+        for btn in (btn_insertar, btn_buscar, btn_eliminar):
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
@@ -131,9 +156,36 @@ class TriesResiduos(QMainWindow):
                 }
             """)
 
+        btn_limpiar.setStyleSheet("""
+            QPushButton {
+                    background-color: #7C3AED;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                }
+                QPushButton:hover {
+                    background-color: #6D28D9;
+            }
+        """)
+
+        # Agregar widgets al layout
         controls_layout.addWidget(lbl_insertar)
         controls_layout.addWidget(self.input_insertar)
         controls_layout.addWidget(btn_insertar)
+
+        controls_layout.addSpacing(10)
+        controls_layout.addWidget(lbl_buscar)
+        controls_layout.addWidget(self.input_buscar)
+        controls_layout.addWidget(btn_buscar)
+
+        controls_layout.addSpacing(10)
+        controls_layout.addWidget(lbl_eliminar)
+        controls_layout.addWidget(self.input_eliminar)
+        controls_layout.addWidget(btn_eliminar)
+
+        controls_layout.addSpacing(15)
         controls_layout.addWidget(btn_limpiar)
 
         body_layout.addWidget(controls_frame, stretch=1)
@@ -141,7 +193,6 @@ class TriesResiduos(QMainWindow):
         main_layout.addLayout(body_layout)
 
         self.setCentralWidget(central)
-
     # ================= MÉTODOS =================
     def insertar_palabra(self):
         palabra = self.input_insertar.text().strip()
@@ -149,11 +200,51 @@ class TriesResiduos(QMainWindow):
             try:
                 self.controller.insertar(palabra)
                 self.input_insertar.clear()
+                self.nodo_resaltado = None
                 self.dibujar_trie()
+                QMessageBox.information(self, "Éxito", f"Palabra '{palabra}' insertada correctamente.")
             except ValueError as e:
                 QMessageBox.warning(self, "Error", str(e))
         else:
             QMessageBox.warning(self, "Error", "Debe ingresar una palabra para insertar.")
+
+    def buscar_letra(self):
+        letra = self.input_buscar.text().strip().upper()
+        if letra:
+            try:
+                encontrada, posicion, nodo = self.controller.buscar(letra)
+                if encontrada:
+                    self.nodo_resaltado = letra
+                    self.dibujar_trie()
+                    QMessageBox.information(
+                        self,
+                        "Búsqueda",
+                        f"✓ La letra '{letra}' SÍ está en el Trie.\n\n"
+                        f"Posición (secuencia de bits): {posicion}\n"
+                        f"Código binario completo: {self.controller.codigos[letra]}"
+                    )
+                else:
+                    self.nodo_resaltado = None
+                    self.dibujar_trie()
+                    QMessageBox.information(self, "Búsqueda", f"✗ La letra '{letra}' NO está en el Trie.")
+                self.input_buscar.clear()
+            except Exception as e:
+                QMessageBox.warning(self, "Error", str(e))
+        else:
+            QMessageBox.warning(self, "Error", "Debe ingresar una letra para buscar.")
+    def eliminar_letra(self):
+        letra = self.input_eliminar.text().strip().upper()
+        if letra:
+            try:
+                self.controller.eliminar(letra)
+                self.input_eliminar.clear()
+                self.nodo_resaltado = None
+                self.dibujar_trie()
+                QMessageBox.information(self, "Éxito", f"Letra '{letra}' eliminada. Árbol reconstruido.")
+            except ValueError as e:
+                QMessageBox.warning(self, "Error", str(e))
+        else:
+            QMessageBox.warning(self, "Error", "Debe ingresar una letra para eliminar.")
 
     def limpiar_trie(self):
         """Reinicia el trie"""

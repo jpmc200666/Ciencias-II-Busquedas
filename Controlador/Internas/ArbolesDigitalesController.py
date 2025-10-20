@@ -3,17 +3,27 @@
 class NodoBinario:
     def __init__(self):
         self.children = {'0': None, '1': None}  # hijos binarios
-        self.letters = []      # letras almacenadas en este nodo
-        self.end_words = set() # palabra final si termina aquí
+        self.letters = []       # letras almacenadas en este nodo
+        self.end_words = set()  # palabras que terminan aquí
 
 
 class ArbolesDigitalesController:
     def __init__(self):
+        # Nodo raíz del árbol
         self.root = NodoBinario()
-        # Mapeo letras -> binario de 5 bits
-        self.codigos = {chr(97 + i): format(i + 1, "05b") for i in range(26)}
-        self.current_word = None  # solo una clave a la vez
 
+        # Mapeo: letra → binario de 5 bits (a = 00001, b = 00010, ..., z = 11010)
+        self.codigos = {chr(97 + i): format(i + 1, "05b") for i in range(26)}
+
+        # Lista de palabras actualmente en el árbol
+        self.palabras = []
+
+        # Última palabra insertada
+        self.current_word = None
+
+    # =========================================================
+    # MÉTODO: INSERTAR PALABRA
+    # =========================================================
     def insertar(self, palabra: str):
         palabra = palabra.lower().strip()
         if not palabra:
@@ -23,27 +33,29 @@ class ArbolesDigitalesController:
         if not letras:
             return "INVALID"
 
-        # reiniciar árbol y clave actual
-        self.root = NodoBinario()
         self.current_word = "".join(letras)
-
-        # set para controlar letras ya insertadas
         letras_insertadas = set()
 
-        # primera letra en raíz
+        if self.root is None:
+            self.root = NodoBinario()
+
+        # Primera letra (va en la raíz)
         primera = letras[0]
         if primera not in self.codigos:
             return "INVALID_CHAR"
-        self.root.letters = [primera]
-        letras_insertadas.add(primera)
 
-        # resto de letras
+        if not self.root.letters:
+            self.root.letters = [primera]
+        elif primera not in self.root.letters:
+            self.root.letters.append(primera)
+
+        letras_insertadas.add(primera)
         current = self.root
+
+        # Resto de letras
         for letra in letras[1:]:
             if letra not in self.codigos:
                 continue
-
-            # ignorar si ya se insertó antes
             if letra in letras_insertadas:
                 continue
 
@@ -51,6 +63,7 @@ class ArbolesDigitalesController:
             nodo = self.root
             placed = False
 
+            # Recorre el código binario
             for bit in codigo:
                 if nodo.children[bit] is None:
                     nodo.children[bit] = NodoBinario()
@@ -65,34 +78,91 @@ class ArbolesDigitalesController:
                 nodo.letters.append(letra)
 
             current = nodo
-            letras_insertadas.add(letra)  # marcar letra como insertada
+            letras_insertadas.add(letra)
 
-        # marcar palabra completa
+        # Marca palabra completa
         current.end_words.add(self.current_word)
+
+        # Guarda la palabra en la lista
+        if self.current_word not in self.palabras:
+            self.palabras.append(self.current_word)
+
         return "OK"
 
+    # =========================================================
+    # MÉTODO: BUSCAR CLAVE
+    # =========================================================
     def buscar_clave(self, letra: str):
-        """Busca una letra y devuelve su código binario si existe, None si no."""
-        letra = letra.lower().strip()
-        if len(letra) != 1 or letra not in self.codigos:
+        """Devuelve la ruta binaria donde se encuentra una letra, o None si no existe."""
+        if not self.root:
             return None
 
-        return self.codigos[letra]
+        def recorrer(node, actual_path):
+            if node is None:
+                return None
 
-        resultado = None
+            if letra in node.letters:
+                return actual_path
 
-        def dfs(nodo):
-            nonlocal resultado
-            if resultado:
-                return
-            if letra in nodo.letters:
-                idx = nodo.letters.index(letra)
-                resultado = (nodo, idx)
-                return
-            for b in ('0', '1'):
-                hijo = nodo.children.get(b)
-                if hijo:
-                    dfs(hijo)
+            for bit, hijo in node.children.items():
+                resultado = recorrer(hijo, actual_path + bit)
+                if resultado is not None:
+                    return resultado
+            return None
 
-        dfs(self.root)
-        return resultado
+        return recorrer(self.root, "")
+
+    # =========================================================
+    # MÉTODO: ELIMINAR CLAVE
+    # =========================================================
+    def eliminar_clave(self, letra: str):
+        """
+        Elimina una letra del árbol y reconstruye las palabras sin dicha letra.
+        """
+        letra = letra.lower().strip()
+
+        if not letra or len(letra) != 1 or letra not in self.codigos:
+            return "Debe ingresar una sola letra válida (a-z)."
+
+        # Verificar si la letra existe en el árbol
+        if self.buscar_clave(letra) is None:
+            return f"La letra '{letra}' no existe en el árbol."
+
+        # 🔥 Crear nuevas palabras quitando la letra
+        nuevas_palabras = []
+        for p in self.palabras:
+            nueva = p.replace(letra, "")
+            if nueva:  # evita insertar palabras vacías
+                nuevas_palabras.append(nueva)
+
+        if not nuevas_palabras:
+            # Si ninguna palabra sobrevive, vacía todo
+            self.eliminar_arbol()
+            return "OK", None
+
+        # Actualizar lista de palabras
+        self.palabras = nuevas_palabras
+
+        # 🔁 Vaciar y reconstruir el árbol
+        self.root = NodoBinario()
+        for p in self.palabras:
+            self.insertar(p)
+
+        return "OK", self.root
+
+    # =========================================================
+    # MÉTODO: ELIMINAR ÁRBOL COMPLETO
+    # =========================================================
+    def eliminar_arbol(self):
+        """
+        Elimina completamente el árbol digital, todas las palabras y resetea los datos internos.
+        """
+        # Crear nueva raíz vacía
+        self.root = NodoBinario()
+
+        # Vaciar la lista de palabras y la palabra actual
+        self.palabras.clear()
+        self.current_word = None
+
+        return "OK"
+

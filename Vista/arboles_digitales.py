@@ -127,6 +127,7 @@ class ArbolesDigitales(QMainWindow):
         btn_buscar = QPushButton("Buscar")
         btn_buscar.clicked.connect(self.buscar_palabra)
 
+
         # Estilos botones morados
         for btn in (btn_insertar, btn_buscar):
             btn.setStyleSheet("""
@@ -151,6 +152,52 @@ class ArbolesDigitales(QMainWindow):
         controls_layout.addWidget(btn_buscar)
 
         body_layout.addWidget(controls_frame, stretch=1)
+        # Eliminar clave
+        lbl_eliminar = QLabel("Eliminar Clave:")
+        lbl_eliminar.setStyleSheet("font-size: 14px; color: #4C1D95; font-weight: bold;")
+        self.input_eliminar = QLineEdit()
+        self.input_eliminar.setPlaceholderText("Ingrese clave a eliminar")
+
+        btn_eliminar = QPushButton("Eliminar")
+        btn_eliminar.clicked.connect(self.eliminar_palabra)
+
+        # Estilo botón eliminar
+        btn_eliminar.setStyleSheet("""
+            QPushButton {
+                    background-color: #7C3AED;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                }
+                QPushButton:hover {
+                    background-color: #6D28D9;
+            }
+        """)
+
+        controls_layout.addWidget(lbl_eliminar)
+        controls_layout.addWidget(self.input_eliminar)
+        controls_layout.addWidget(btn_eliminar)
+
+        # --- Botón eliminar árbol completo ---
+        btn_eliminar_arbol = QPushButton("Eliminar Árbol")
+        btn_eliminar_arbol.setStyleSheet("""
+           QPushButton {
+                    background-color: #7C3AED;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                }
+                QPushButton:hover {
+                    background-color: #6D28D9;
+            }
+        """)
+        btn_eliminar_arbol.clicked.connect(self.eliminar_arbol)
+
+        controls_layout.addWidget(btn_eliminar_arbol)
 
         # Agregar el cuerpo al layout principal
         main_layout.addLayout(body_layout)
@@ -197,13 +244,15 @@ class ArbolesDigitales(QMainWindow):
         controls_layout.addWidget(lbl_abecedario)
         controls_layout.addLayout(alphabet_layout)
 
+
     # --- Lógica ---
     def insertar_palabra(self):
         palabra = self.input_insertar.text().strip()
         if palabra:
             estado = self.controller.insertar(palabra)
             if estado == "OK":
-                self.input_insertar.clear()
+                self.input_insertar.setReadOnly(True)  # 🔒 Bloquea el campo
+                self.input_insertar.setStyleSheet("background-color: #E9D5FF; color: #4C1D95; font-weight: bold;")
                 self.dibujar_arbol()
             else:
                 QMessageBox.warning(self, "Error", f"No se pudo insertar: {estado}")
@@ -237,7 +286,18 @@ class ArbolesDigitales(QMainWindow):
     def dibujar_arbol(self):
         """Dibuja el árbol binario en la escena."""
         self.scene.clear()
+        self.view.setScene(self.scene)
         root = self.controller.root
+        if not root or (not root.letters and not any(root.children.values())):
+            # Si el árbol está vacío, mostrar mensaje
+            text_item = QGraphicsTextItem("Árbol vacío")
+            text_item.setDefaultTextColor(QColor("#4C1D95"))
+            text_item.setScale(1.5)
+            text_item.setPos(-60, -20)
+            self.scene.addItem(text_item)
+            self.view.setSceneRect(self.scene.itemsBoundingRect())
+            return
+
         level_gap = 90
         start_offset = 280
 
@@ -286,3 +346,81 @@ class ArbolesDigitales(QMainWindow):
 
         draw(root, 0, 0, start_offset, 1)
         self.view.setSceneRect(self.scene.itemsBoundingRect())
+
+    def eliminar_palabra(self):
+        palabra = self.input_eliminar.text().strip()
+        if palabra:
+            resultado = self.controller.eliminar_clave(palabra)
+
+            # 🔧 Corregimos cómo se maneja la tupla (estado, root)
+            if isinstance(resultado, tuple):
+                estado, nuevo_root = resultado
+            else:
+                estado, nuevo_root = resultado, None
+
+            if estado == "OK":
+                # 🔁 Actualizar el árbol del controlador y redibujar correctamente
+                if nuevo_root:
+                    self.controller.root = nuevo_root
+
+                self.input_eliminar.clear()
+
+                QMessageBox.information(
+                    self,
+                    "Eliminación",
+                    f"La clave '{palabra}' fue eliminada correctamente."
+                )
+
+                # 🔄 Redibujar el árbol actualizado
+                self.scene.clear()
+                self.dibujar_arbol()
+                self.scene.update()
+                self.view.viewport().update()
+
+            else:
+                QMessageBox.warning(self, "Error", f"No se pudo eliminar la clave: {estado}")
+        else:
+            QMessageBox.warning(self, "Error", "Debe ingresar una palabra para eliminar.")
+
+    def eliminar_arbol(self):
+        """Elimina completamente el árbol y reinicia los campos."""
+        confirm = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            "¿Seguro que deseas eliminar todo el árbol?\nEsta acción no se puede deshacer.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if confirm == QMessageBox.No:
+            return
+
+        try:
+            # 🔁 Reiniciar estructura del árbol
+            self.controller.eliminar_arbol()  # ✅ Llama al método del controlador para limpiar todo
+
+            # 🧹 Limpiar campo y desbloquearlo
+            self.input_insertar.clear()
+            self.input_insertar.setReadOnly(False)
+            self.input_insertar.setStyleSheet("")
+
+            # 🧽 Limpiar también los campos de búsqueda y eliminación
+            self.input_buscar.clear()
+            self.input_eliminar.clear()
+
+            # 🌳 Limpiar escena del árbol
+            self.scene.clear()
+
+            # 📝 Mostrar mensaje visual
+            text_item = QGraphicsTextItem("Árbol vacío")
+            text_item.setDefaultTextColor(QColor("#4C1D95"))
+            text_item.setScale(1.5)
+            text_item.setPos(-60, -20)
+            self.scene.addItem(text_item)
+            self.view.setScene(self.scene)
+            self.view.setSceneRect(self.scene.itemsBoundingRect())
+
+            QMessageBox.information(self, "Árbol eliminado",
+                                    "Se ha eliminado el árbol y puedes insertar una nueva palabra.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Ocurrió un problema al eliminar el árbol: {str(e)}")

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame, QComboBox, QSpinBox,
-    QPushButton, QGridLayout, QScrollArea, QMessageBox, QHBoxLayout, QDialog, QInputDialog, QFileDialog
+    QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
+    QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
+    QInputDialog, QHBoxLayout, QDialog, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt
 
@@ -14,33 +15,34 @@ class TruncamientoInterna(QMainWindow):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
         self.controller = TruncamientoController()
-        self.labels = []
-        self.capacidad = 0
-
         self.setWindowTitle("Ciencias de la Computación II - Función Hash (Truncamiento)")
 
         # --- Layout principal ---
         central = QWidget()
         layout = QVBoxLayout(central)
-        layout.setSpacing(20)
+        layout.setSpacing(15)
 
-        # --- Encabezado con gradiente ---
+        # --- Encabezado ---
         header = QFrame()
         header.setStyleSheet("""
-            background: qlineargradient(
-                spread:pad, x1:0, y1:0, x2:1, y2:0,
-                stop:0 #D8B4FE, stop:1 #A78BFA
-            );
+            background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0,
+            stop:0 #D8B4FE, stop:1 #A78BFA);
             border-radius: 12px;
         """)
         header_layout = QVBoxLayout(header)
+        header_layout.setSpacing(5)
 
         titulo = QLabel("Ciencias de la Computación II - Función Hash (Truncamiento)")
         titulo.setAlignment(Qt.AlignCenter)
-        titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
+        titulo.setStyleSheet("""
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            margin-top: 10px;
+        """)
         header_layout.addWidget(titulo)
 
-        # --- Menú debajo del título ---
+        # --- Menú superior ---
         menu_layout = QHBoxLayout()
         menu_layout.setSpacing(40)
         menu_layout.setAlignment(Qt.AlignCenter)
@@ -65,62 +67,74 @@ class TruncamientoInterna(QMainWindow):
             menu_layout.addWidget(btn)
 
         header_layout.addLayout(menu_layout)
+        layout.addWidget(header)
+
         btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
 
-        layout.addWidget(header)
+        # --- Controles superiores ---
+        controles_superiores = QHBoxLayout()
+        controles_superiores.setSpacing(15)
+        controles_superiores.setAlignment(Qt.AlignCenter)
 
-        # --- Controles principales ---
+        lbl_rango = QLabel("Rango (10^n):")
+        lbl_rango.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.rango = QComboBox()
         self.rango.addItems([f"10^{i}" for i in range(1, 6)])
+        self.rango.setFixedWidth(100)
+
+        lbl_digitos = QLabel("Número de dígitos:")
+        lbl_digitos.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
+        self.digitos.setFixedWidth(60)
+
+        controles_superiores.addWidget(lbl_rango)
+        controles_superiores.addWidget(self.rango)
+        controles_superiores.addWidget(lbl_digitos)
+        controles_superiores.addWidget(self.digitos)
+        layout.addLayout(controles_superiores)
+
+        # --- Botones principales ---
+        botones_layout = QGridLayout()
+        botones_layout.setSpacing(12)
+        botones_layout.setAlignment(Qt.AlignCenter)
 
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_agregar = QPushButton("Adicionar claves")
-        self.btn_cargar = QPushButton("Cargar estructura")
-        self.btn_eliminar = QPushButton("Eliminar estructura")
         self.btn_buscar = QPushButton("Buscar clave")
         self.btn_eliminar_clave = QPushButton("Eliminar clave")
         self.btn_deshacer = QPushButton("Deshacer último movimiento")
         self.btn_guardar = QPushButton("Guardar estructura")
+        self.btn_eliminar = QPushButton("Eliminar estructura")
+        self.btn_cargar = QPushButton("Cargar estructura")
 
-        for btn in (
-            self.btn_crear, self.btn_agregar, self.btn_cargar, self.btn_eliminar,
-            self.btn_buscar, self.btn_eliminar_clave, self.btn_deshacer, self.btn_guardar
-        ):
+        botones = [
+            self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_eliminar_clave,
+            self.btn_deshacer, self.btn_guardar, self.btn_eliminar, self.btn_cargar
+        ]
+
+        for i, btn in enumerate(botones):
+            btn.setFixedHeight(45)
+            btn.setFixedWidth(240)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
                     color: white;
-                    padding: 10px 20px;
-                    font-size: 16px;
+                    font-size: 15px;
                     border-radius: 10px;
+                    padding: 8px 20px;
                 }
                 QPushButton:hover {
                     background-color: #6D28D9;
                 }
             """)
+            fila = i // 4
+            col = i % 4
+            botones_layout.addWidget(btn, fila, col, alignment=Qt.AlignCenter)
 
-        controles = QVBoxLayout()
-        controles.addWidget(QLabel("Rango (10^n):"))
-        controles.addWidget(self.rango)
-        controles.addWidget(QLabel("Número de dígitos de la clave:"))
-        controles.addWidget(self.digitos)
-
-        grid_botones = QGridLayout()
-        grid_botones.addWidget(self.btn_crear, 0, 0)
-        grid_botones.addWidget(self.btn_agregar, 0, 1)
-        grid_botones.addWidget(self.btn_cargar, 1, 0)
-        grid_botones.addWidget(self.btn_eliminar, 1, 1)
-        grid_botones.addWidget(self.btn_buscar, 2, 0)
-        grid_botones.addWidget(self.btn_eliminar_clave, 2, 1)
-        grid_botones.addWidget(self.btn_deshacer, 3, 0)
-        grid_botones.addWidget(self.btn_guardar, 3, 1)
-        controles.addLayout(grid_botones)
-
-        layout.addLayout(controles)
+        layout.addLayout(botones_layout)
 
         # --- Contenedor con scroll ---
         self.scroll = QScrollArea()
@@ -133,7 +147,7 @@ class TruncamientoInterna(QMainWindow):
 
         self.setCentralWidget(central)
 
-        # --- Conexiones ---
+        # Conexiones
         self.btn_crear.clicked.connect(self.crear_estructura)
         self.btn_agregar.clicked.connect(self.adicionar_claves)
         self.btn_cargar.clicked.connect(self.cargar_estructura)
@@ -143,9 +157,16 @@ class TruncamientoInterna(QMainWindow):
         self.btn_deshacer.clicked.connect(self.deshacer)
         self.btn_guardar.clicked.connect(self.guardar_estructura)
 
-    # ===================== MÉTODOS FUNCIONALES =====================
+        # Estado
+        self.labels = []
+        self.capacidad = 0
+
+    # ==============================================================
+    # MÉTODOS FUNCIONALES
+    # ==============================================================
 
     def crear_estructura(self):
+        # Limpia la vista
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
             if w:
@@ -174,6 +195,7 @@ class TruncamientoInterna(QMainWindow):
         else:
             QMessageBox.warning(self, "Cancelado", "Debes seleccionar posiciones.")
 
+        # Dibujar estructura visual
         for i in range(min(self.capacidad, 100)):
             self._agregar_cuadro(i + 1, i + 1)
 
@@ -206,7 +228,7 @@ class TruncamientoInterna(QMainWindow):
             return
 
         if not self.controller.posiciones:
-            QMessageBox.warning(self, "Error", "Selecciona posiciones primero.")
+            QMessageBox.warning(self, "Error", "Seleccione las posiciones primero.")
             return
 
         dialogo = DialogoClave(
@@ -241,9 +263,8 @@ class TruncamientoInterna(QMainWindow):
         if not ok or not clave.strip():
             return
 
-        datos = self.controller.estructura
         encontrado = None
-        for pos, valor in datos.items():
+        for pos, valor in self.controller.estructura.items():
             if str(valor) == clave:
                 encontrado = pos
                 break
@@ -251,7 +272,7 @@ class TruncamientoInterna(QMainWindow):
         if encontrado:
             QMessageBox.information(self, "Resultado", f"Clave {clave} encontrada en posición {encontrado}")
         else:
-            QMessageBox.warning(self, "Resultado", f"Clave {clave} no encontrada")
+            QMessageBox.warning(self, "Resultado", "Clave no encontrada.")
 
     def deshacer(self):
         res = self.controller.deshacer()

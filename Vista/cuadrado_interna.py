@@ -1,23 +1,16 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel, QFrame,
-    QComboBox, QSpinBox, QPushButton, QGridLayout, QScrollArea,
-    QMessageBox, QHBoxLayout
-)
-from PySide6.QtCore import Qt
-from .dialogo_clave import DialogoClave
-from Controlador.Internas.cuadrado_controller import CuadradoController
-
-
-from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QSpinBox, QGridLayout, QMessageBox, QScrollArea,
     QFileDialog, QInputDialog, QFrame, QDialog
 )
 from PySide6.QtCore import Qt
-
 from Controlador.Internas.cuadrado_controller import CuadradoController
 from Vista.dialogo_clave import DialogoClave
 from Vista.dialogo_colision import DialogoColisiones
+from Controlador.arreglo_anidado_controller import ArregloAnidadoController
+from Vista.vista_arreglo_anidado import VistaArregloAnidado
+from Controlador.lista_encadenada_controller import ListaEncadenadaController
+from Vista.vista_lista_encadenada import VistaListaEncadenada
 
 
 class CuadradoInterna(QMainWindow):
@@ -25,7 +18,8 @@ class CuadradoInterna(QMainWindow):
         super().__init__()
         self.cambiar_ventana = cambiar_ventana
         self.controller = CuadradoController()
-        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Cuadrado Medio)")
+        self.estrategia_actual = None  # Para recordar la estrategia seleccionada
+        self.setWindowTitle("Ciencias de la Computación II - Función Hash (Cuadrado)")
 
         # --- Layout principal ---
         central = QWidget()
@@ -48,7 +42,6 @@ class CuadradoInterna(QMainWindow):
         titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: white; margin: 10px;")
         header_layout.addWidget(titulo)
 
-        # --- Menú debajo del título ---
         menu_layout = QHBoxLayout()
         menu_layout.setSpacing(40)
         menu_layout.setAlignment(Qt.AlignCenter)
@@ -72,37 +65,59 @@ class CuadradoInterna(QMainWindow):
             """)
             menu_layout.addWidget(btn)
 
-        header_layout.addLayout(menu_layout)
         btn_inicio.clicked.connect(lambda: self.cambiar_ventana("inicio"))
         btn_busqueda.clicked.connect(lambda: self.cambiar_ventana("busqueda"))
-
+        header_layout.addLayout(menu_layout)
         layout.addWidget(header)
 
-        # --- Controles superiores ---
+        # --- Controles superiores (misma línea) ---
+        controles_layout = QHBoxLayout()
+        controles_layout.setAlignment(Qt.AlignCenter)
+
+        lbl_rango = QLabel("Rango (10^n):")
+        lbl_rango.setStyleSheet("font-weight: bold;")
         self.rango = QComboBox()
         self.rango.addItems([f"10^{i}" for i in range(1, 6)])
+        self.rango.setFixedWidth(80)
+
+        lbl_digitos = QLabel("Número de dígitos:")
+        lbl_digitos.setStyleSheet("font-weight: bold;")
         self.digitos = QSpinBox()
         self.digitos.setRange(1, 10)
         self.digitos.setValue(4)
+        self.digitos.setFixedWidth(60)
+
+        controles_layout.addWidget(lbl_rango)
+        controles_layout.addWidget(self.rango)
+        controles_layout.addSpacing(20)
+        controles_layout.addWidget(lbl_digitos)
+        controles_layout.addWidget(self.digitos)
+        layout.addLayout(controles_layout)
+
+        # --- Botones (mismo diseño y tamaño que Mod) ---
+        botones_layout = QGridLayout()
+        botones_layout.setSpacing(15)
 
         self.btn_crear = QPushButton("Crear estructura")
         self.btn_agregar = QPushButton("Adicionar claves")
-        self.btn_cargar = QPushButton("Cargar estructura")
-        self.btn_eliminar = QPushButton("Eliminar estructura")
         self.btn_buscar = QPushButton("Buscar clave")
         self.btn_eliminar_clave = QPushButton("Eliminar clave")
         self.btn_deshacer = QPushButton("Deshacer último movimiento")
         self.btn_guardar = QPushButton("Guardar estructura")
+        self.btn_eliminar = QPushButton("Eliminar estructura")
+        self.btn_cargar = QPushButton("Cargar estructura")
 
-        for btn in (
-            self.btn_crear, self.btn_agregar, self.btn_cargar, self.btn_eliminar,
-            self.btn_buscar, self.btn_eliminar_clave, self.btn_deshacer, self.btn_guardar
-        ):
+        botones = [
+            self.btn_crear, self.btn_agregar, self.btn_buscar, self.btn_eliminar_clave,
+            self.btn_deshacer, self.btn_guardar, self.btn_eliminar, self.btn_cargar
+        ]
+
+        for btn in botones:
+            btn.setFixedHeight(50)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #7C3AED;
                     color: white;
-                    padding: 10px 20px;
                     font-size: 16px;
                     border-radius: 10px;
                 }
@@ -111,26 +126,19 @@ class CuadradoInterna(QMainWindow):
                 }
             """)
 
-        controles = QVBoxLayout()
-        controles.addWidget(QLabel("Rango (10^n):"))
-        controles.addWidget(self.rango)
-        controles.addWidget(QLabel("Número de dígitos de la clave:"))
-        controles.addWidget(self.digitos)
+        # --- Misma distribución que en ModInterna ---
+        botones_layout.addWidget(self.btn_crear, 0, 0)
+        botones_layout.addWidget(self.btn_agregar, 0, 1)
+        botones_layout.addWidget(self.btn_buscar, 0, 2)
+        botones_layout.addWidget(self.btn_eliminar_clave, 0, 3)
+        botones_layout.addWidget(self.btn_deshacer, 1, 0)
+        botones_layout.addWidget(self.btn_guardar, 1, 1)
+        botones_layout.addWidget(self.btn_eliminar, 1, 2)
+        botones_layout.addWidget(self.btn_cargar, 1, 3)
 
-        grid_botones = QGridLayout()
-        grid_botones.addWidget(self.btn_crear, 0, 0)
-        grid_botones.addWidget(self.btn_agregar, 0, 1)
-        grid_botones.addWidget(self.btn_cargar, 1, 0)
-        grid_botones.addWidget(self.btn_eliminar, 1, 1)
-        grid_botones.addWidget(self.btn_buscar, 2, 0)
-        grid_botones.addWidget(self.btn_eliminar_clave, 2, 1)
-        grid_botones.addWidget(self.btn_deshacer, 3, 0)
-        grid_botones.addWidget(self.btn_guardar, 3, 1)
-        controles.addLayout(grid_botones)
+        layout.addLayout(botones_layout)
 
-        layout.addLayout(controles)
-
-        # --- Contenedor con scroll ---
+        # --- Área de scroll (visualización de estructura) ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.contenedor = QWidget()
@@ -161,6 +169,7 @@ class CuadradoInterna(QMainWindow):
             if widget:
                 widget.setParent(None)
         self.labels.clear()
+        self.estrategia_actual = None  # Resetear estrategia
 
         n = int(self.rango.currentText().split("^")[1])
         self.capacidad = 10 ** n
@@ -208,18 +217,46 @@ class CuadradoInterna(QMainWindow):
             return
 
         clave = dialogo.get_clave()
+
+        # Si ya hay una estrategia definida, usarla directamente
+        if self.estrategia_actual:
+            resultado = self.controller.adicionar_clave(clave, self.estrategia_actual)
+
+            if resultado == "OK":
+                QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
+                self.actualizar_vista_segun_estrategia()
+            elif resultado == "LONGITUD":
+                QMessageBox.warning(self, "Error", "Longitud de clave incorrecta.")
+            elif resultado == "REPETIDA":
+                QMessageBox.warning(self, "Error", "La clave ya existe.")
+            else:
+                QMessageBox.warning(self, "Error", f"Resultado inesperado: {resultado}")
+            return
+
+        # Primera inserción o sin estrategia definida
         resultado = self.controller.adicionar_clave(clave)
 
         if resultado == "COLISION":
             dlg_col = DialogoColisiones(self)
             if dlg_col.exec() == QDialog.Accepted:
                 estrategia = dlg_col.get_estrategia()
-                resultado = self.controller.adicionar_clave(clave, estrategia)
+                # NORMALIZAR AQUÍ cuando guardas
+                self.estrategia_actual = estrategia.lower()  # ← CAMBIO IMPORTANTE
+
+                resultado = self.controller.adicionar_clave(clave, self.estrategia_actual)
+
+                if resultado == "OK":
+                    QMessageBox.information(self, "Éxito", f"Clave {clave} insertada con estrategia: {estrategia}")
+                    self.actualizar_vista_segun_estrategia()
+                elif resultado == "LONGITUD":
+                    QMessageBox.warning(self, "Error", "Longitud de clave incorrecta.")
+                elif resultado == "REPETIDA":
+                    QMessageBox.warning(self, "Error", "La clave ya existe.")
             else:
                 QMessageBox.information(self, "Cancelado", "Inserción cancelada.")
                 return
 
-        if resultado == "OK":
+        elif resultado == "OK":
             QMessageBox.information(self, "Éxito", f"Clave {clave} insertada correctamente.")
             self.actualizar_tabla()
         elif resultado == "LONGITUD":
@@ -229,16 +266,45 @@ class CuadradoInterna(QMainWindow):
         else:
             QMessageBox.warning(self, "Error", f"Resultado inesperado: {resultado}")
 
+
+    def actualizar_vista_segun_estrategia(self):
+        """Actualiza la vista según la estrategia de colisión seleccionada"""
+        if self.estrategia_actual == "arreglo anidado":
+            anidado_ctrl = ArregloAnidadoController(self.controller)
+            vista_anidada = VistaArregloAnidado(self.grid, anidado_ctrl)
+            vista_anidada.dibujar()
+        elif self.estrategia_actual == "lista encadenada":
+            encadenada_ctrl = ListaEncadenadaController(self.controller)
+            vista_encadenada = VistaListaEncadenada(self.grid, encadenada_ctrl)
+            vista_encadenada.dibujar()
+        else:
+            # Estrategias de direccionamiento abierto (lineal, cuadrática, doble hash)
+            self.actualizar_tabla()
+
     def cargar_estructura(self):
         ruta, _ = QFileDialog.getOpenFileName(self, "Cargar estructura", "", "Archivos JSON (*.json)")
         if ruta:
             self.controller.ruta_archivo = ruta
             if self.controller.cargar():
-                QMessageBox.information(self, "Éxito", "Estructura cargada correctamente.")
-                self.actualizar_tabla()
+                # Actualizar capacidad y dígitos desde el controlador
+                self.capacidad = self.controller.capacidad
+
+                # Detectar estrategia del archivo cargado
+                if hasattr(self.controller, 'estrategia_fija') and self.controller.estrategia_fija:
+                    self.estrategia_actual = self.controller.estrategia_fija.lower()
+
+                # Si tiene estructura_anidada, es arreglo anidado o lista encadenada
+                if hasattr(self.controller, 'estructura_anidada') and self.controller.estructura_anidada:
+                    # Intentar detectar por el formato si no hay estrategia_fija
+                    if not self.estrategia_actual:
+                        # Si alguna sublista tiene más de 0 elementos, usar lista encadenada por defecto
+                        self.estrategia_actual = "lista encadenada"
+
+                QMessageBox.information(self, "Éxito",
+                                        f"Estructura cargada correctamente.\nEstrategia: {self.estrategia_actual or 'direccionamiento abierto'}")
+                self.actualizar_vista_segun_estrategia()
             else:
                 QMessageBox.warning(self, "Error", "No se pudo cargar el archivo.")
-
     def eliminar_estructura(self):
         resp = QMessageBox.question(
             self, "Eliminar estructura", "¿Desea eliminar la estructura actual?",
@@ -249,6 +315,9 @@ class CuadradoInterna(QMainWindow):
             self.controller.capacidad = 0
             self.controller.digitos = 0
             self.controller.historial.clear()
+            self.estrategia_actual = None  # Resetear estrategia
+            if hasattr(self.controller, 'estructura_anidada'):
+                self.controller.estructura_anidada = []
             self.actualizar_tabla()
             QMessageBox.information(self, "Éxito", "Estructura eliminada correctamente.")
 
@@ -257,15 +326,49 @@ class CuadradoInterna(QMainWindow):
         if ok and clave:
             datos = self.controller.obtener_datos_vista()
             encontrado = None
+            posicion_detallada = None
+
+            # Buscar en estructura principal
             for pos, valor in datos["estructura"].items():
                 if str(valor) == clave:
                     encontrado = pos
+                    posicion_detallada = f"posición {pos} (arreglo principal)"
                     break
 
+            # Si no se encontró y hay estructura anidada, buscar ahí también
+            if not encontrado and hasattr(self.controller, 'estructura_anidada'):
+                for idx, sublista in enumerate(self.controller.estructura_anidada):
+                    if sublista and isinstance(sublista, list):
+                        for sub_idx, item in enumerate(sublista):
+                            if str(item) == clave:
+                                encontrado = idx + 1
+                                # Formato correcto para que el regex lo detecte
+                                posicion_detallada = f"posición {idx + 1} (lista encadenada {sub_idx + 1})"
+                                break
+                        if encontrado:
+                            break
+
             if encontrado:
-                QMessageBox.information(self, "Resultado", f"Clave {clave} encontrada en posición {encontrado}")
+                QMessageBox.information(self, "Resultado", f"Clave {clave} encontrada en {posicion_detallada}")
+
+                # Resaltar visualmente la clave encontrada
+                self.resaltar_clave(encontrado, posicion_detallada)
             else:
                 QMessageBox.warning(self, "Resultado", f"Clave {clave} no encontrada")
+
+    def resaltar_clave(self, posicion, detalle):
+        """Resalta visualmente la clave encontrada"""
+        # Solo funciona si estamos usando vista de arreglo anidado o lista encadenada
+        if self.estrategia_actual in ["arreglo anidado", "lista encadenada"]:
+            # Redibujar con el resaltado
+            if self.estrategia_actual == "arreglo anidado":
+                anidado_ctrl = ArregloAnidadoController(self.controller)
+                vista_anidada = VistaArregloAnidado(self.grid, anidado_ctrl, resaltar=(posicion, detalle))
+                vista_anidada.dibujar()
+            elif self.estrategia_actual == "lista encadenada":
+                encadenada_ctrl = ListaEncadenadaController(self.controller)
+                vista_encadenada = VistaListaEncadenada(self.grid, encadenada_ctrl, resaltar=(posicion, detalle))
+                vista_encadenada.dibujar()
 
     def eliminar_clave(self):
         clave, ok = QInputDialog.getText(self, "Eliminar clave", "Ingrese la clave a eliminar:")
@@ -275,7 +378,7 @@ class CuadradoInterna(QMainWindow):
         resultado = self.controller.eliminar_clave(clave.strip())
         if resultado == "OK":
             QMessageBox.information(self, "Éxito", f"Clave {clave} eliminada.")
-            self.actualizar_tabla()
+            self.actualizar_vista_segun_estrategia()
         elif resultado == "NO_EXISTE":
             QMessageBox.warning(self, "Error", f"La clave {clave} no existe.")
         else:
@@ -285,7 +388,7 @@ class CuadradoInterna(QMainWindow):
         resultado = self.controller.deshacer()
         if resultado == "OK":
             QMessageBox.information(self, "Éxito", "Se deshizo el último movimiento.")
-            self.actualizar_tabla()
+            self.actualizar_vista_segun_estrategia()
         elif resultado == "VACIO":
             QMessageBox.warning(self, "Aviso", "No hay movimientos para deshacer.")
 
@@ -303,6 +406,7 @@ class CuadradoInterna(QMainWindow):
             QMessageBox.critical(self, "Error", f"No se pudo guardar:\n{e}")
 
     def actualizar_tabla(self):
+        """Actualiza la vista para estrategias de direccionamiento abierto"""
         datos = self.controller.obtener_datos_vista()
         estructura = datos.get("estructura", {})
 

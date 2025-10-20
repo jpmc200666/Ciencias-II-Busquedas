@@ -97,5 +97,5 @@ class DialogoColisiones(QDialog):
         layout.addStretch()
 
     def get_estrategia(self) -> str:
-        """Devuelve la estrategia seleccionada por el usuario."""
+        """Devuelve el texto de la estrategia seleccionada."""
         return self.combo.currentText()

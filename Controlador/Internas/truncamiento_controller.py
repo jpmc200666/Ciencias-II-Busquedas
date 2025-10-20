@@ -34,10 +34,10 @@ class TruncamientoController:
         return "OK"
 
     def _digitos_necesarios(self) -> int:
-        """Determina cuántos dígitos se necesitan según la capacidad."""
+        """Determina cuántos dígitos se necesitan según la capacidad (mínimo 2)."""
         if self.capacidad <= 1:
-            return 1
-        return len(str(self.capacidad - 1))
+            return 2
+        return max(2, len(str(self.capacidad - 1)))
 
     # -------------------------------
     # FUNCIÓN HASH (TRUNCAMIENTO)
