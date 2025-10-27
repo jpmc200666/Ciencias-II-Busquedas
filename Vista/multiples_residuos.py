@@ -257,29 +257,32 @@ class MultiplesResiduos(QMainWindow):
         self.scene.clear()
         root = self.controller.root
 
-        level_gap = 100
-        start_offset = 400
+        # Parámetros visuales
+        level_gap = 120
+        node_radius = 26
+        horizontal_gap = 70  # espacio base entre nodos hermanos
 
         pen_line = QPen(QColor("#4C1D95"), 2)
-        brush_root = QBrush(QColor("#9F7AEA"))  # morado medio para raíz
-        brush_internal = QBrush(QColor("#C4B5FD"))  # morado claro para nodos internos
-        brush_leaf = QBrush(QColor("#7C3AED"))  # morado oscuro para hojas con letras
+        brush_root = QBrush(QColor("#9F7AEA"))
+        brush_internal = QBrush(QColor("#C4B5FD"))
+        brush_leaf = QBrush(QColor("#7C3AED"))
         pen_node = QPen(QColor("#3b0764"), 2)
         edge_color = QColor("#4C1D95")
 
-        def sort_key(item):
-            """Ordenar: 00, 01, 10, 11, luego el bit solitario '1'"""
-            key, _ = item
-            if len(key) == 2:
-                return (0, key)
-            else:
-                return (1, key)
+        def calcular_ancho(node):
+            """Devuelve el ancho total (en px) que ocupa el subárbol."""
+            if not node.children:
+                return horizontal_gap
+            total = 0
+            for child in node.children.values():
+                total += calcular_ancho(child)
+            return total
 
-        def draw(node, x, y, offset, depth, is_root=False):
-            radio = 28
-            circle = QGraphicsEllipseItem(x - radio, y - radio, 2 * radio, 2 * radio)
+        def draw(node, x, y, is_root=False):
+            """Dibuja recursivamente cada nodo del trie."""
+            circle = QGraphicsEllipseItem(x - node_radius, y - node_radius, 2 * node_radius, 2 * node_radius)
 
-            # Colores según tipo de nodo
+            # Color según tipo
             if is_root:
                 circle.setBrush(brush_root)
             elif node.letra:
@@ -290,66 +293,48 @@ class MultiplesResiduos(QMainWindow):
             circle.setPen(pen_node)
             self.scene.addItem(circle)
 
-            # Texto del nodo
-            if is_root:
-                text = "root"
-            elif node.letra:
-                text = node.letra.upper()
-            else:
-                text = "*"
-
+            # Texto centrado
+            text = "root" if is_root else (node.letra.upper() if node.letra else "*")
             text_item = QGraphicsTextItem(text)
             text_item.setDefaultTextColor(Qt.white)
-            text_item.setPos(x - radio / 1.7, y - 10)
+            text_item.setScale(1.1)
+            text_rect = text_item.boundingRect()
+            text_item.setPos(x - text_rect.width() / 2, y - text_rect.height() / 2)
             self.scene.addItem(text_item)
 
             # Dibujar hijos
-            children = sorted(node.children.items(), key=sort_key)
-            num_children = len(children)
-
-            if num_children == 0:
+            children = list(node.children.items())
+            if not children:
                 return
 
-            # Calcular posiciones de los hijos
-            if num_children == 1:
-                positions = [x]
-            elif num_children == 2:
-                positions = [x - offset / 2, x + offset / 2]
-            elif num_children == 3:
-                positions = [x - offset, x, x + offset]
-            else:  # 4 o más
-                positions = [x - offset * 1.5, x - offset / 2, x + offset / 2, x + offset * 1.5]
-
-            for idx, (key, child) in enumerate(children):
-                if idx < len(positions):
-                    child_x = positions[idx]
-                else:
-                    child_x = x
-
+            total_width = sum(calcular_ancho(child) for _, child in children)
+            start_x = x - total_width / 2
+            for key, child in children:
+                ancho_child = calcular_ancho(child)
+                child_x = start_x + ancho_child / 2
                 child_y = y + level_gap
 
                 # Línea padre-hijo
-                self.scene.addLine(x, y + radio, child_x, child_y - radio, pen_line)
+                self.scene.addLine(x, y + node_radius, child_x, child_y - node_radius, pen_line)
 
-                # Etiqueta de la arista (mostrar los bits)
-                label_text = key
+                # Etiqueta de arista
                 mid_x = (x + child_x) / 2
-                mid_y = (y + child_y) / 2 - 10
-                bit_label = QGraphicsTextItem(label_text)
-                bit_label.setDefaultTextColor(edge_color)
-                bit_label.setPos(mid_x - 8, mid_y - 6)
-                self.scene.addItem(bit_label)
+                mid_y = (y + child_y) / 2 - 14
+                label = QGraphicsTextItem(key)
+                label.setDefaultTextColor(edge_color)
+                label.setScale(0.9)
+                label.setPos(mid_x - 8, mid_y)
+                self.scene.addItem(label)
 
-                # Recursión (reducir offset)
-                draw(child, child_x, child_y, max(60, offset / 1.8), depth + 1)
+                draw(child, child_x, child_y)
+                start_x += ancho_child
 
-        draw(root, 0, 0, start_offset, 0, is_root=True)
+        draw(root, 0, 0, is_root=True)
 
-        # Ajustar vista
+        # Ajuste de vista
         brect = self.scene.itemsBoundingRect()
-        if brect.isNull():
-            return
+        margin = 80
+        brect.adjust(-margin, -margin, margin, margin)
         self.view.setSceneRect(brect)
-        self.view.resetTransform()
         self.view.fitInView(brect, Qt.KeepAspectRatio)
-        self.view.scale(1.2, 1.2)
+        self.view.scale(1.1, 1.1)

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPen, QBrush, QColor
 from Controlador.Internas.ArbolesHuffmanController import ArbolesHuffmanController
+from fractions import Fraction
 
 
 class ArbolesHuffman(QMainWindow):
@@ -242,10 +243,20 @@ class ArbolesHuffman(QMainWindow):
             self.scene.addItem(circle)
 
             # Texto del nodo (carácter y frecuencia)
+            try:
+                freq_frac = str(Fraction(node.freq).limit_denominator())
+            except Exception:
+                freq_frac = str(node.freq)
+
+            # Mostrar fracción y carácter (si lo tiene)
             if node.char is not None:
-                txt = f"{node.char}\n{node.freq}"
+                txt = f"{node.char}\n{freq_frac}"
             else:
-                txt = str(node.freq)
+                # Si es raíz, mostrar '1' si la suma total es 1.0
+                if abs(node.freq - 1.0) < 1e-6:
+                    txt = "1"
+                else:
+                    txt = freq_frac
 
             text_item = QGraphicsTextItem(txt)
             text_item.setDefaultTextColor(text_color)
@@ -299,7 +310,7 @@ class ArbolesHuffman(QMainWindow):
         texto = "Carácter | Frecuencia | Código\n"
         texto += "-" * 40 + "\n"
 
-        for char in sorted(frecuencias.keys()):
+        for char in frecuencias.keys():
             char_display = char if char != ' ' else '[espacio]'
             freq = frecuencias[char]
             codigo = codigos.get(char, "N/A")
